@@ -1,0 +1,2329 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>流动性 & 杠杆监控台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#FBFAF7; --ink-2:#F6F3EC; --ink-3:#F1EDE4; --raised:#EAE4D8;
+    --line:#CDC6B8; --line-soft:#DED7C9;
+    --txt:#1B1E24; --txt-2:#434850; --txt-3:#6A6E76;
+    --water:#0A7178; --water-deep:#05494F; --water-glow:rgba(10,113,120,.15);
+    --amber:#A15E0C; --amber-glow:rgba(161,94,12,.15);
+    --red:#BE2C2C; --red-glow:rgba(190,44,44,.13);
+    --ok:#0C6E48;
+    --well:#E9E3D7;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --disp:'Space Grotesk',sans-serif;
+    --body:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--ink);color:var(--txt);font-family:var(--body);-webkit-font-smoothing:antialiased}
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(10,113,120,.045), transparent 60%),
+      linear-gradient(180deg,#E9E5DC,#E2DDD2);
+    min-height:100vh;
+    background-attachment:fixed;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:26px 20px 60px}
+
+  /* ---- header ---- */
+  header.top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--line-soft)}
+  .brand h1{font-family:var(--disp);font-weight:600;font-size:20px;letter-spacing:.3px;margin:0;display:flex;align-items:center;gap:10px}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--water);box-shadow:0 0 0 4px var(--water-glow);animation:pulse 2.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .brand p{margin:5px 0 0;color:var(--txt-3);font-size:12.5px;font-family:var(--mono);letter-spacing:.2px}
+  .actions{display:flex;align-items:center;gap:10px}
+  .updated{font-family:var(--mono);font-size:11px;color:var(--txt-3);text-align:right;line-height:1.5}
+  button.refresh.reset{background:transparent;color:var(--txt-3);border:1px solid var(--line);margin-left:8px}
+  button.refresh.reset:hover{border-color:var(--amber);color:var(--amber)}
+  button.refresh{
+    font-family:var(--disp);font-weight:600;font-size:13px;color:var(--ink);
+    background:var(--water);border:0;border-radius:8px;padding:9px 15px;cursor:pointer;
+    display:flex;align-items:center;gap:7px;transition:transform .1s, box-shadow .2s;
+    box-shadow:0 0 0 1px var(--water-deep), 0 6px 18px -8px var(--water)
+  }
+  button.refresh:hover{transform:translateY(-1px)}
+  button.refresh:active{transform:translateY(0)}
+  button.refresh.loading{opacity:.6;pointer-events:none}
+  button.refresh svg{width:14px;height:14px}
+  button.refresh.loading svg{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---- hero ---- */
+  .hero{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;margin-top:20px}
+  @media(max-width:760px){.hero{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--ink-2),var(--ink-3));border:1px solid var(--line-soft);border-radius:14px;padding:18px;box-shadow:0 1px 2px rgba(45,38,25,.05),0 4px 14px -6px rgba(45,38,25,.07)}
+  .hero-net{position:relative;overflow:hidden}
+  .hero-net .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt-3)}
+  .hero-net .big{font-family:var(--disp);font-weight:700;font-size:52px;line-height:1;margin:10px 0 4px;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+  .hero-net .big .unit{font-size:22px;color:var(--txt-2);font-weight:500;margin-left:4px}
+  .hero-net .formula{font-family:var(--mono);font-size:11.5px;color:var(--txt-3);margin-top:2px}
+  .hero-net .delta{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-family:var(--mono);font-size:12.5px;padding:5px 10px;border-radius:7px;border:1px solid var(--line)}
+  .hero-net .spark{position:absolute;right:14px;bottom:12px;opacity:.9}
+
+  /* ---- stage ---- */
+  .stage{display:flex;flex-direction:column;justify-content:center;gap:10px}
+  .stage .lbl{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt-3)}
+  .stage .name{font-family:var(--disp);font-weight:600;font-size:22px;line-height:1.15}
+  .stage .desc{font-size:13px;color:var(--txt-2);line-height:1.55}
+  .stage-track{display:flex;gap:6px;margin-top:4px}
+  .stage-track .seg{flex:1;height:5px;border-radius:3px;background:var(--line)}
+  .stage-track .seg.on{background:var(--water)}
+  .stage-track .seg.on.b{background:var(--amber)}
+
+  /* ---- vessels ---- */
+  .section-h{display:flex;align-items:baseline;gap:12px;margin:26px 2px 12px}
+  .section-h .n{font-family:var(--mono);font-size:12px;color:var(--water);letter-spacing:1px}
+  .section-h h2{font-family:var(--disp);font-weight:600;font-size:16px;margin:0}
+  .section-h .sub{color:var(--txt-3);font-size:12px;margin-left:auto;font-family:var(--mono)}
+  .vessels{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:680px){.vessels{grid-template-columns:1fr}}
+  .vessel{background:var(--ink-2);border:1px solid var(--line-soft);border-radius:12px;padding:15px;display:flex;gap:14px;align-items:stretch;box-shadow:0 1px 2px rgba(45,38,25,.05),0 4px 14px -6px rgba(45,38,25,.07)}
+  .tube{position:relative;width:46px;flex:0 0 46px;border:1px solid var(--line);border-radius:8px;background:var(--well);overflow:hidden}
+  .tube .fill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,var(--water),var(--water-deep));transition:height 1s cubic-bezier(.2,.7,.2,1)}
+  .tube .fill.amber{background:linear-gradient(180deg,var(--amber),#8a5f1e)}
+  .tube .fill.red{background:linear-gradient(180deg,var(--red),#7d2626)}
+  .tube .surface{position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,.55)}
+  .tube .mark{position:absolute;left:0;right:0;border-top:1px dashed rgba(236,91,91,.6)}
+  .tube .mark.mark-target{border-top:1.5px dashed var(--water);opacity:0.8}
+  .tube .mark.mark-target span{color:var(--water)}
+  .tube .mark span{position:absolute;right:2px;top:-13px;font-size:8.5px;color:var(--red);font-family:var(--mono)}
+  .vinfo{flex:1;min-width:0;display:flex;flex-direction:column}
+  .vinfo .vname{font-family:var(--disp);font-weight:600;font-size:14px}
+  .vinfo .vcode{font-family:var(--mono);font-size:10px;color:var(--txt-3);margin-top:1px}
+  .vinfo .vval{font-family:var(--mono);font-weight:700;font-size:25px;margin-top:auto;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+  .vinfo .vval .u{font-size:13px;color:var(--txt-2);font-weight:500}
+  .vinfo .vmeta{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);margin-top:3px;display:flex;justify-content:space-between;gap:6px}
+  .vinfo .vmeta .chg.up{color:var(--amber)}
+  .vinfo .vmeta .chg.down{color:var(--water)}
+
+  /* ---- signal panels ---- */
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
+  @media(max-width:820px){.panels{grid-template-columns:1fr}}
+  .panel{background:var(--ink-2);border:1px solid var(--line-soft);border-radius:14px;overflow:hidden;transition:opacity .4s, filter .4s;box-shadow:0 1px 2px rgba(45,38,25,.05),0 4px 14px -6px rgba(45,38,25,.07)}
+  .panel .phead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+  .panel .phead .tag{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:5px;border:1px solid var(--line)}
+  .panel .phead h3{font-family:var(--disp);font-weight:600;font-size:15px;margin:0}
+  .panel .phead .arm{margin-left:auto;font-family:var(--mono);font-size:10.5px;padding:4px 9px;border-radius:20px}
+  .arm.armed{color:var(--ink);background:var(--amber)}
+  .arm.locked{color:var(--txt-3);border:1px solid var(--line)}
+  .arm.live{color:var(--ink);background:var(--water)}
+  .panel.gated.locked{opacity:.5;filter:saturate(.4)}
+  .panel.gated.locked::after{content:"缓冲垫尚在 · 价格信号待布防";display:block;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);padding:0 0 12px}
+
+  .row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+  .row:last-child{border-bottom:0}
+  .light{width:10px;height:10px;border-radius:50%;flex:0 0 10px;background:var(--txt-3);position:relative}
+  .light.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(72,199,154,.15)}
+  .light.amber{background:var(--amber);box-shadow:0 0 0 3px var(--amber-glow)}
+  .light.red{background:var(--red);box-shadow:0 0 0 3px var(--red-glow);animation:pulse 1.4s infinite}
+  .light.mute{background:var(--txt-3);opacity:.5}
+  .rmain{flex:1;min-width:0}
+  .rmain .rname{font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:8px}
+  .rmain .rname .code{font-family:var(--mono);font-size:10px;color:var(--txt-3)}
+  .rmain .rlogic{font-size:11.5px;color:var(--txt-3);margin-top:3px;line-height:1.5}
+  .rval{text-align:right;font-family:var(--mono);flex:0 0 auto}
+  .rval .v{font-weight:700;font-size:17px;font-variant-numeric:tabular-nums}
+  .rval .thr{font-size:10px;color:var(--txt-3);margin-top:2px}
+  .rval .v.warn{color:var(--amber)} .rval .v.bad{color:var(--red)} .rval .v.good{color:var(--ok)}
+
+  /* ---- calibration ---- */
+  details.calib{margin-top:18px;background:var(--ink-2);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden}
+  details.calib summary{cursor:pointer;list-style:none;padding:14px 16px;font-family:var(--disp);font-weight:600;font-size:14px;display:flex;align-items:center;gap:10px}
+  .manual-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--amber);background:var(--amber-glow);border:1px solid var(--amber);border-radius:20px;padding:3px 10px;letter-spacing:.2px;white-space:nowrap}
+  @keyframes dueBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.97)}}
+  .due-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;font-weight:700;color:#fff;background:var(--red);border:1px solid var(--red);border-radius:20px;padding:2px 8px;letter-spacing:.2px;white-space:nowrap;animation:dueBlink 1s ease-in-out infinite;margin-left:6px}
+  .due-badge.hidden{display:none !important;animation:none}
+  .manual-badge.sm{font-size:9px;padding:2px 7px;font-weight:600}
+  .auto-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;font-weight:600;color:var(--ok);background:rgba(12,110,72,.1);border:1px solid var(--ok);border-radius:20px;padding:2px 7px;letter-spacing:.2px}
+  details.calib summary::-webkit-details-marker{display:none}
+  details.calib summary .chev{margin-left:auto;transition:transform .2s;color:var(--txt-3)}
+  details.calib[open] summary .chev{transform:rotate(90deg)}
+  .calib-body{padding:4px 16px 18px;border-top:1px solid var(--line-soft)}
+  .calib-note{font-size:12px;color:var(--txt-2);line-height:1.6;margin:12px 0}
+  .inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:680px){.inputs{grid-template-columns:1fr 1fr}}
+  .field label{display:block;font-family:var(--mono);font-size:10.5px;color:var(--txt-3);margin-bottom:5px;letter-spacing:.3px}
+  .field .in{display:flex;align-items:center;background:var(--well);border:1px solid var(--line);border-radius:8px;padding:2px 10px}
+  .field input{width:100%;background:transparent;border:0;color:var(--txt);font-family:var(--mono);font-size:15px;font-weight:600;padding:8px 0;outline:none}
+  .field .suf{font-family:var(--mono);font-size:11px;color:var(--txt-3)}
+  .field a{font-size:10.5px;color:var(--water);text-decoration:none;font-family:var(--mono)}
+  .field a:hover{text-decoration:underline}
+
+  /* ---- reference ---- */
+  .ref{margin-top:16px}
+  .ref .src{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .ref .src a{font-family:var(--mono);font-size:11px;color:var(--txt-2);text-decoration:none;border:1px solid var(--line);border-radius:20px;padding:5px 11px;transition:border-color .2s,color .2s}
+  .ref .src a:hover{border-color:var(--water);color:var(--water)}
+  .disclaimer{margin-top:22px;padding:14px 16px;border:1px solid var(--line-soft);border-radius:10px;background:rgba(161,94,12,.06);font-size:11.5px;color:var(--txt-2);line-height:1.65}
+  .qtag{display:inline-block;font-family:var(--mono);font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:5px;padding:2px 7px;margin-left:8px;vertical-align:middle}
+  .err{color:var(--amber);font-family:var(--mono);font-size:10px}
+  table.ltab{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+  table.ltab th{color:var(--txt-3);font-weight:500;text-align:right;padding:4px 6px;border-bottom:1px solid var(--line-soft);font-size:10px}
+  table.ltab th:first-child{text-align:left}
+  table.ltab td{padding:2px 4px;border-bottom:1px solid var(--line-soft)}
+  table.ltab td:first-child{color:var(--txt-2)}
+  table.ltab input{width:100%;background:var(--well);border:1px solid var(--line-soft);border-radius:5px;color:var(--txt);font-family:var(--mono);font-size:11px;padding:5px 6px;text-align:right;outline:none}
+  table.ltab input:focus{border-color:var(--water)}
+  table.ltab input.ym{text-align:left}
+  table.ltab th:last-child, table.ltab td:last-child{width:24px;padding:2px 2px}
+  table.ltab button.delrow{background:transparent;border:1px solid var(--line);color:var(--txt-3);border-radius:5px;width:22px;height:22px;line-height:1;cursor:pointer;font-size:13px;padding:0;font-family:var(--mono)}
+  table.ltab button.delrow:hover{border-color:var(--red);color:var(--red);background:rgba(190,44,44,.08)}
+  button.addrow{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--water);background:transparent;border:1px dashed var(--line);border-radius:7px;padding:7px 12px;cursor:pointer;width:100%}
+  .pdf-drop{border:2px dashed var(--line);border-radius:10px;padding:14px 10px;margin-bottom:10px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+  .pdf-drop:hover, .pdf-drop.dragover{border-color:var(--water);background:var(--water-glow)}
+  .pdf-drop-inner{font-family:var(--mono);font-size:11px;color:var(--txt-2);line-height:1.6}
+  .pdf-drop-inner b{color:var(--water)}
+  .pdf-drop.busy .pdf-drop-inner{color:var(--amber)}
+  .pdf-preview{margin-top:10px;padding:11px 13px;background:var(--well);border:1px solid var(--line-soft);border-radius:9px;font-family:var(--mono);font-size:11.5px;display:none}
+  .pdf-preview.show{display:block}
+  .pdf-preview .prow{display:flex;justify-content:space-between;align-items:center;padding:4px 0;gap:8px}
+  .pdf-preview .prow label{color:var(--txt-3);flex:0 0 auto}
+  .pdf-preview .prow input{width:110px;background:var(--ink-2);border:1px solid var(--line);border-radius:5px;color:var(--txt);font-family:var(--mono);font-size:11.5px;padding:4px 7px;text-align:right}
+  .pdf-preview .pbtns{display:flex;gap:8px;margin-top:8px}
+  .pdf-preview button{flex:1;padding:7px;border-radius:6px;border:1px solid var(--water);background:var(--water);color:#fff;font-family:var(--mono);font-size:11px;font-weight:600;cursor:pointer}
+  .pdf-preview button.reject{background:transparent;color:var(--txt-3);border-color:var(--line)}
+  .pdf-warn{color:var(--amber);font-size:10.5px;margin-top:6px;display:none}
+  .iorb-warn{display:none;margin:10px 16px 14px;padding:10px 13px;border:1px solid var(--red);background:var(--red-glow);border-radius:9px;font-family:var(--mono);font-size:11.5px;color:var(--red);font-weight:600;line-height:1.55}
+  .iorb-warn.show{display:block}
+  .pdf-warn.show{display:block}
+  button.addrow:hover{border-color:var(--water)}
+  table.wktab{width:calc(100% - 32px);margin:2px 16px 14px;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+  table.wktab th{color:var(--txt-3);font-weight:500;text-align:right;padding:5px 8px;border-bottom:1px solid var(--line-soft);font-size:10px}
+  table.wktab th:first-child{text-align:left;color:var(--water)}
+  table.wktab td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line-soft);font-variant-numeric:tabular-nums}
+  table.wktab td:first-child{text-align:left;color:var(--txt-2)}
+  table.wktab td:last-child{color:var(--txt);font-weight:600}
+  table.wktab tr:last-child td{border-bottom:0}
+  .cot-toggle{display:flex;gap:8px;padding:12px 16px 4px}
+  .cot-toggle button{font-family:var(--mono);font-size:12px;color:var(--txt-2);background:transparent;border:1px solid var(--line);border-radius:20px;padding:6px 14px;cursor:pointer;transition:all .15s}
+  .cot-toggle button:hover{border-color:var(--water)}
+  .cot-toggle button.on{color:var(--ink);background:var(--water);border-color:var(--water);font-weight:600}
+  .cot-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:10px 16px 4px}
+  @media(max-width:680px){.cot-charts{grid-template-columns:1fr}}
+  .chartbox{background:var(--well);border:1px solid var(--line-soft);border-radius:10px;padding:12px 12px 8px}
+  .chartbox .ctop{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .chartbox .ctitle{font-family:var(--disp);font-weight:600;font-size:12.5px}
+  .chartbox .cnow{font-family:var(--mono);font-size:12px;font-weight:700}
+  .chartbox .cpct{font-family:var(--mono);font-size:10px;color:var(--txt-3);margin-top:2px}
+  .chartbox svg{width:100%;height:auto;display:block;margin-top:4px}
+  .chartbox .cx{font-family:var(--mono);font-size:9px;fill:var(--txt-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1><span class="dot"></span>流动性 &amp; 杠杆监控台</h1>
+      <p>WALCL − TGA − ON&nbsp;RRP&nbsp;&nbsp;//&nbsp;&nbsp;water-level vs price-signal, gated by ON RRP</p>
+    </div>
+    <div class="actions">
+      <div class="updated" id="updated">—</div>
+      <button class="refresh" id="refreshBtn" onclick="run()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+        刷新
+      </button>
+      <button class="refresh reset" id="resetBtn" onclick="resetToDefaults()" title="清空本地保存,恢复到内置的最新默认数据">恢复默认</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div class="card hero-net">
+      <div class="eyebrow">Net Liquidity · 净流动性</div>
+      <div class="big" id="netVal">—<span class="unit">B</span></div>
+      <div class="formula" id="netFormula">总资产 − 财政部账户 − 隔夜逆回购</div>
+      <div class="delta" id="netDelta">近5日流向 —</div>
+      <svg class="spark" id="netSpark" width="150" height="42"></svg>
+    </div>
+    <div class="card stage">
+      <div class="lbl">Regime · 当前阶段</div>
+      <div class="name" id="stageName">—</div>
+      <div class="stage-track" id="stageTrack">
+        <div class="seg"></div><div class="seg"></div>
+      </div>
+      <div class="desc" id="stageDesc">正在读取数据…</div>
+    </div>
+  </div>
+
+  <div class="section-h">
+    <span class="n">01</span><h2>三个蓄水池</h2>
+    <span class="sub" id="bucketSrc">reserves · TGA · ON RRP</span>
+  </div>
+  <div class="vessels" id="vessels"></div>
+
+  <div class="panels" style="grid-template-columns:1fr;margin-top:6px">
+    <div class="panel">
+      <div class="phead">
+        <span class="tag">TGA&nbsp;趋势</span>
+        <h3>财政部账户 · 周度走势 · 对比 QRA 季度目标</h3>
+        <span class="arm live" id="tgaChartArm">自动</span>
+      </div>
+      <div id="tgaChart" style="padding:4px 0 8px"></div>
+    </div>
+  </div>
+
+  <div class="section-h">
+    <span class="n">02</span><h2>报警面板</h2>
+    <span class="sub">水位表看趋势 · 价格表确认拐点</span>
+  </div>
+  <div class="panels">
+    <div class="panel" id="panelWater">
+      <div class="phead">
+        <span class="tag">WATER&nbsp;LEVEL</span>
+        <h3>水位表 · 趋势与择时背景</h3>
+        <span class="arm live">常开</span>
+      </div>
+      <div id="waterRows"></div>
+    </div>
+    <div class="panel gated" id="panelPrice">
+      <div class="phead">
+        <span class="tag">PRICE&nbsp;SIGNAL</span>
+        <h3>价格表 · 稀缺实锤报警</h3>
+        <span class="arm" id="priceArm">—</span>
+      </div>
+      <div id="priceRows"></div>
+      <div class="iorb-warn" id="iorbWarn"></div>
+      <div class="cot-charts" id="spreadCharts" style="padding-bottom:14px"></div>
+    </div>
+  </div>
+
+  <div class="section-h">
+    <span class="n">03</span><h2>杠杆监控</h2>
+    <span class="sub">数量侧 · 手动月度更新</span>
+  </div>
+
+  <div class="hero" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="card hero-net">
+      <div class="eyebrow">FINRA Margin Debt · 保证金总额 <span class="manual-badge sm">✎ 手动·次月第3周·FINRA</span><span id="dueFinra" class="due-badge hidden">⚠ 该更新了</span></div>
+      <div class="big" id="mdVal" style="font-size:40px">—<span class="unit">B</span></div>
+      <div class="formula" id="mdMeta">全市场借方余额 · 月度</div>
+      <div class="delta" id="mdYoY">同比 —</div>
+      <svg class="spark" id="mdSpark" width="130" height="38"></svg>
+    </div>
+    <div class="card hero-net">
+      <div class="eyebrow">Credit Balance · 信用余额</div>
+      <div class="big" id="cbVal" style="font-size:40px">—<span class="unit">B</span></div>
+      <div class="formula">自由信用 − 保证金债务;负=杠杆满、缓冲薄</div>
+      <div class="delta" id="cbNote">—</div>
+    </div>
+    <div class="card hero-net">
+      <div class="eyebrow">IBKR Margin Loans · 盈透(领先约3周)<span class="manual-badge sm">✎ 手动·次月1号·IBKR</span><span id="dueIbkr" class="due-badge hidden">⚠ 该更新了</span></div>
+      <div class="big" id="ibVal" style="font-size:40px">—<span class="unit">B</span></div>
+      <div class="formula" id="ibMeta">单一券商代理 · 次月1号发布</div>
+      <div class="delta" id="ibDiv">背离 —</div>
+      <svg class="spark" id="ibSpark" width="130" height="38"></svg>
+    </div>
+  </div>
+
+  <div class="hero" style="grid-template-columns:1fr 1fr;margin-top:14px">
+    <div class="card hero-net">
+      <div class="eyebrow">Robinhood Margin Book <span class="manual-badge sm">✎ 手动·次月上旬·HOOD</span><span id="dueRh" class="due-badge hidden">⚠ 该更新了</span></div>
+      <div class="big" id="rhVal" style="font-size:34px">—<span class="unit">B</span></div>
+      <div class="formula" id="rhMeta">散户端代理 · Monthly Metrics</div>
+      <div class="delta" id="rhChg">变化 —</div>
+      <svg class="spark" id="rhSpark" width="130" height="38"></svg>
+    </div>
+    <div class="card hero-net">
+      <div class="eyebrow">Schwab Margin Balances <span class="manual-badge sm">✎ 手动·次月中旬·SCHW</span><span id="dueSc" class="due-badge hidden">⚠ 该更新了</span></div>
+      <div class="big" id="scVal" style="font-size:34px">—<span class="unit">B</span></div>
+      <div class="formula" id="scMeta">大众零售端代理 · Monthly Activity Report</div>
+      <div class="delta" id="scChg">变化 —</div>
+      <svg class="spark" id="scSpark" width="130" height="38"></svg>
+    </div>
+  </div>
+
+  <div class="panels" style="grid-template-columns:1fr;margin-top:6px">
+    <div class="panel">
+      <div class="phead">
+        <span class="tag">EXCESS&nbsp;LEVERAGE</span>
+        <h3>超额杠杆 · margin-debt 同比 − 标普同比</h3>
+        <span class="arm" id="exArm">—</span>
+      </div>
+      <div id="exRows"></div>
+      <div class="cot-charts" id="exCharts" style="padding-bottom:14px"></div>
+    </div>
+  </div>
+
+  <div class="panels" style="grid-template-columns:1fr;margin-top:6px">
+    <div class="panel">
+      <div class="phead">
+        <span class="tag">LEVERAGE&nbsp;TREND</span>
+        <h3>杠杆走势 · 保证金债务 / 信用余额 / 月度坡度</h3>
+        <span class="arm live" id="levTrendArm">自动</span>
+      </div>
+      <div id="levTrendChart" style="padding:4px 0 8px"></div>
+    </div>
+  </div>
+
+  <div class="section-h">
+    <span class="sub">HY OAS · IG OAS · 自动周度</span>
+  </div>
+
+  <div class="hero" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="card hero-net">
+      <div class="eyebrow">HY OAS · 垃圾债利差 <span class="manual-badge sm">✎ 自动·每周·FRED</span><span id="dueCreditHY" class="due-badge hidden">⚠ 该更新了</span></div>
+      <div class="big" id="hyVal" style="font-size:40px">—<span class="unit">bp</span></div>
+      <div class="formula" id="hyMeta">ICE BofA US High Yield OAS · 周度</div>
+      <div class="delta" id="hyChg">变化 —</div>
+    </div>
+    <div class="card hero-net">
+      <div class="eyebrow">IG OAS · 投资级利差 <span class="manual-badge sm">✎ 自动·每周·FRED</span><span id="dueCreditIG" class="due-badge hidden">⚠ 该更新了</span></div>
+      <div class="big" id="igVal" style="font-size:40px">—<span class="unit">bp</span></div>
+      <div class="formula">ICE BofA US Corporate(投资级)OAS</div>
+      <div class="delta" id="igChg">变化 —</div>
+    </div>
+    <div class="card hero-net">
+      <div class="eyebrow">HY − IG 差值</div>
+      <div class="big" id="diffVal" style="font-size:40px">—<span class="unit">bp</span></div>
+      <div class="formula">降级至垃圾级的边际风险溢价</div>
+      <div class="delta" id="diffNote">—</div>
+    </div>
+  </div>
+
+  <div class="panels" style="grid-template-columns:1fr;margin-top:6px">
+    <div class="panel" id="panelCreditAlert">
+      <div class="phead">
+        <span class="tag">WIDENING&nbsp;ALERT</span>
+        <h3>4周走阔警报 · 阈值 35bp</h3>
+        <span class="arm" id="creditAlertArm">—</span>
+      </div>
+      <div id="creditAlertRow"></div>
+    </div>
+  </div>
+
+  <div class="panels" style="grid-template-columns:1fr;margin-top:6px">
+    <div class="panel">
+      <div class="phead">
+        <span class="tag">CREDIT&nbsp;SIGNAL</span>
+        <h3>信用市场是否在为风险合理定价</h3>
+        <span class="arm" id="creditArm">—</span>
+      </div>
+      <div id="creditRows"></div>
+    </div>
+  </div>
+
+  <div class="panels" style="grid-template-columns:1fr;margin-top:6px">
+    <div class="panel">
+      <div class="phead">
+        <span class="tag">12M&nbsp;TREND</span>
+        <h3>近12个月利差走势</h3>
+      </div>
+      <div class="cot-charts" id="creditCharts" style="padding-bottom:14px"></div>
+    </div>
+  </div>
+
+  <details class="calib" id="creditTable">
+    <summary>信用利差周度数据<span class="manual-badge"> 自动更新·每周·FRED </span></summary>
+    <div class="calib-body">
+      <p class="calib-note"><b>更新节奏:</b>FRED 每<b>交易日</b>更新。HY OAS 与 IG OAS 由 Cloudflare Worker 自动获取，并按周采样用于4周警报与12个月图表。数值单位为百分点(2.70 = 270bp)，面板自动换算为 bp 显示。<a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2" target="_blank" style="color:var(--water)">FRED · HY OAS↗</a> ・ <a href="https://fred.stlouisfed.org/series/BAMLC0A0CM" target="_blank" style="color:var(--water)">FRED · IG OAS↗</a></p>
+      <table class="ltab" id="creditTab"></table>
+      <button class="addrow" onclick="addCreditRow()">+ 添加一周</button>
+    </div>
+  </details>
+
+  <details class="calib" id="levTables">
+    <summary>杠杆月度数据<span class="manual-badge">✎ 需手动更新 · 每月 · 去 FINRA/IBKR 查</span><span id="dueLevSum" class="due-badge hidden">⚠ 该更新了</span><span class="chev">▸</span></summary>
+    <div class="calib-body">
+      <p class="calib-note"><b>更新节奏:</b>盈透次月<b>第 1 个营业日</b>发布(<a href="https://www.interactivebrokers.com/mkt/getFileNew.php?file=latestMetricPR" target="_blank" style="color:var(--water)">最新稿↗</a> / <a href="https://investors.interactivebrokers.com/en/general/about/monthly-metrics.php" target="_blank" style="color:var(--water)">历史↗</a>),先填它抢跑;FINRA 次月<b>第三周</b>发布(<a href="https://www.finra.org/rules-guidance/key-topics/margin-accounts/margin-statistics" target="_blank" style="color:var(--water)">Margin Statistics↗</a>),再填它盖章。数值单位 $B,直接改数字即可,面板实时重算,浏览器本地会自动保存。</p>
+
+      <div class="field" style="max-width:280px;margin:6px 0 16px;display:inline-block">
+        <label>标普500 同比 %(用于算超额杠杆·同比)</label>
+        <div class="in"><input id="in_spxyoy" type="number" step="0.5"><span class="suf">% YoY</span></div>
+        <a href="https://fred.stlouisfed.org/series/SP500" target="_blank">当前 S&P500 vs 一年前 ↗</a>
+      </div>
+      <div class="field" style="max-width:280px;margin:6px 0 16px 18px;display:inline-block">
+        <label>标普500 环比 %(用于算超额杠杆·环比)</label>
+        <div class="in"><input id="in_spxmom" type="number" step="0.5"><span class="suf">% MoM</span></div>
+        <a href="https://fred.stlouisfed.org/series/SP500" target="_blank">当前 S&P500 vs 一月前 ↗</a>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+        <div>
+          <div style="font-family:var(--disp);font-weight:600;font-size:13px;margin-bottom:8px">FINRA(全市场)</div>
+          <table class="ltab" id="finraTab"></table>
+          <button class="addrow" onclick="addRow('finra')">+ 添加月份</button>
+        </div>
+        <div>
+          <div style="font-family:var(--disp);font-weight:600;font-size:13px;margin-bottom:8px">IBKR(盈透)</div>
+          <div class="pdf-drop" id="ibkrDrop" onclick="document.getElementById('ibkrFileInput').click()"
+               ondragover="event.preventDefault();this.classList.add('dragover')"
+               ondragleave="this.classList.remove('dragover')"
+               ondrop="handlePdfDrop(event,'ibkr')">
+            <input type="file" id="ibkrFileInput" accept="application/pdf" style="display:none" onchange="handlePdfFile(this.files[0],'ibkr')">
+            <div class="pdf-drop-inner" id="ibkrDropText">📄 拖拽或点击上传 <b>IBKR Monthly Metrics PDF</b><br>自动识别保证金贷款/客户权益</div>
+          </div>
+          <div class="pdf-preview" id="ibkrPreview">
+            <div class="prow"><label>月份</label><input id="ibkrP_ym" type="text" placeholder="2026-06"></div>
+            <div class="prow"><label>保证金贷款($B)</label><input id="ibkrP_ml" type="number" step="0.1"></div>
+            <div class="prow"><label>客户权益($B)</label><input id="ibkrP_eq" type="number" step="0.1"></div>
+            <div class="pdf-warn" id="ibkrWarn"></div>
+            <div class="pbtns">
+              <button class="reject" onclick="cancelPdfPreview('ibkr')">取消</button>
+              <button onclick="confirmPdfPreview('ibkr')">确认写入</button>
+            </div>
+          </div>
+          <table class="ltab" id="ibkrTab"></table>
+          <button class="addrow" onclick="addRow('ibkr')">+ 添加月份</button>
+        </div>
+      </div>
+
+      <p class="calib-note" style="margin-top:18px"><b>另两家零售/大众端交叉验证:</b>Robinhood 每月发布 Monthly Metrics(<a href="https://investors.robinhood.com/" target="_blank" style="color:var(--water)">investors.robinhood.com↗</a>),看"Margin Book"一行,通常次月上旬发布;嘉信(Schwab)每月发布 Monthly Activity Report(<a href="https://pressroom.aboutschwab.com/" target="_blank" style="color:var(--water)">pressroom.aboutschwab.com↗</a>),看"client margin loan balances",通常次月中旬(约12日前后)发布。<b>注意 Robinhood 在 2026年2月修改了 High-Yield Cash 计划的资金归集方式</b>,当月起margin相关口径有一次性结构调整,前后数值不完全可比,填数据时留意这个断点。</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px">
+        <div>
+          <div style="font-family:var(--disp);font-weight:600;font-size:13px;margin-bottom:8px">Robinhood(散户端)</div>
+          <table class="ltab" id="rhTab"></table>
+          <button class="addrow" onclick="addRow1('robinhood')">+ 添加月份</button>
+        </div>
+        <div>
+          <div style="font-family:var(--disp);font-weight:600;font-size:13px;margin-bottom:8px">Schwab(嘉信)</div>
+          <table class="ltab" id="scTab"></table>
+          <button class="addrow" onclick="addRow1('schwab')">+ 添加月份</button>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="calib">
+    <summary>净流动性校准数据<span class="manual-badge">✎ FRED 自动更新</span></summary>
+    <div class="calib-body">
+      <p class="calib-note">TGA / ON RRP / SOFR / EFFR / SRF 会自动从财政部与纽约联储接口抓取。下面三项来自 FRED 周频序列，自动更新。GDP 用于估算准备金/GDP 比值。</p>
+      <div class="inputs">
+        <div class="field">
+          <label>WALCL 美联储总资产</label>
+          <div class="in"><input id="in_walcl" type="number" step="0.1"><span class="suf">$B</span></div>
+          <a href="https://fred.stlouisfed.org/series/WALCL" target="_blank">FRED · WALCL ↗</a>
+        </div>
+        <div class="field">
+          <label>WRESBAL 准备金余额</label>
+          <div class="in"><input id="in_reserves" type="number" step="0.1"><span class="suf">$B</span></div>
+          <a href="https://fred.stlouisfed.org/series/WRESBAL" target="_blank">FRED · WRESBAL ↗</a>
+        </div>
+        <div class="field">
+          <label>IORB 准备金利率</label>
+          <div class="in"><input id="in_iorb" type="number" step="0.01"><span class="suf">%</span></div>
+          <a href="https://fred.stlouisfed.org/series/IORB" target="_blank">FRED · IORB ↗</a>
+        </div>
+        <div class="field">
+          <label>名义 GDP(年化)</label>
+          <div class="in"><input id="in_gdp" type="number" step="100"><span class="suf">$B</span></div>
+          <a href="https://fred.stlouisfed.org/series/GDP" target="_blank">FRED · GDP ↗</a>
+        </div>
+        <div class="field">
+          <label>准备金/GDP 舒适下限</label>
+          <div class="in"><input id="in_floor" type="number" step="0.1"><span class="suf">%</span></div>
+          <a>经验区间 ~10–11%</a>
+        </div>
+        <div class="field">
+          <label>ON RRP 排空阈值</label>
+          <div class="in"><input id="in_rrpfloor" type="number" step="10"><span class="suf">$B</span></div>
+          <a>低于此值视为缓冲垫排空</a>
+        </div>
+        <div class="field">
+          <label>TGA 季度目标余额 <span class="manual-badge sm">✎ 每季 QRA 后更新</span></label>
+          <div class="in"><input id="in_tgatarget" type="number" step="50"><span class="suf">$B</span></div>
+          <a href="https://home.treasury.gov/policy-issues/financing-the-government/quarterly-refunding/most-recent-quarterly-refunding-documents" target="_blank">财政部 QRA 发布页↗ · 当前季末目标(2026 Q2 QRA):约1000B</a>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <div class="section-h">
+    <span class="n">05</span><h2>宏观条件</h2>
+    <span class="sub">NFCI · 2s10s · 手动周度</span>
+  </div>
+
+  <div class="hero" style="grid-template-columns:1fr 1fr">
+    <div class="card hero-net">
+      <div class="eyebrow">NFCI · 芝加哥联储金融条件指数 <span class="manual-badge sm">✎ 自动·FRED</span></div>
+      <div class="big" id="nfciVal" style="font-size:34px">—</div>
+      <div class="formula" id="nfciMeta">综合信用/杠杆/风险的合成指数 · 0=历史均值</div>
+      <div class="delta" id="nfciChg">变化 —</div>
+      <svg class="spark" id="nfciSpark" width="130" height="38"></svg>
+    </div>
+    <div class="card hero-net">
+      <div class="eyebrow">2s10s · 10Y−2Y 国债利差 <span class="manual-badge sm">✎ 自动·每周·FRED</span></div>
+      <div class="big" id="t10Val" style="font-size:34px">—<span class="unit">%</span></div>
+      <div class="formula">收益率曲线斜率 · 负值=倒挂</div>
+      <div class="delta" id="t10Chg">变化 —</div>
+      <svg class="spark" id="t10Spark" width="130" height="38"></svg>
+    </div>
+  </div>
+
+  <div class="panels" style="grid-template-columns:1fr;margin-top:6px">
+    <div class="panel">
+      <div class="phead">
+        <span class="tag">MACRO&nbsp;CHECK</span>
+        <h3>宏观条件是否印证前面的信用/杠杆信号</h3>
+        <span class="arm" id="macroArm">—</span>
+      </div>
+      <div id="macroRows"></div>
+    </div>
+  </div>
+
+  <div class="panels" style="grid-template-columns:1fr;margin-top:6px">
+    <div class="panel">
+      <div class="phead">
+        <span class="tag">12M&nbsp;TREND</span>
+        <h3>近12个月走势</h3>
+      </div>
+      <div class="cot-charts" id="macroCharts" style="padding-bottom:14px"></div>
+    </div>
+  </div>
+
+  <details class="calib" id="macroTable">
+    <summary>宏观条件周度数据<span class="manual-badge">✎ 需手动更新 · 每周 · 去 FRED 查</span><span id="dueMacroSum" class="due-badge hidden">⚠ 该更新了</span><span class="chev">▸</span></summary>
+    <div class="calib-body">
+      <p class="calib-note"><b>更新节奏:</b>NFCI 每周五发布(<a href="https://fred.stlouisfed.org/series/NFCI" target="_blank" style="color:var(--water)">FRED · NFCI↗</a>),数值本身就是标准化指数,直接填负/正小数(如 -0.515);2s10s 每交易日更新(<a href="https://fred.stlouisfed.org/series/T10Y2Y" target="_blank" style="color:var(--water)">FRED · T10Y2Y↗</a>),取每周最后一个交易日的值,单位为百分点(如 0.35 表示 10Y比2Y高35bp)。</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+        <div>
+          <div style="font-family:var(--disp);font-weight:600;font-size:13px;margin-bottom:8px">NFCI</div>
+          <table class="ltab" id="nfciTab"></table>
+          <button class="addrow" onclick="addRow1('nfci')">+ 添加一周</button>
+        </div>
+        <div>
+          <div style="font-family:var(--disp);font-weight:600;font-size:13px;margin-bottom:8px">2s10s(10Y−2Y)</div>
+          <table class="ltab" id="t10Tab"></table>
+          <button class="addrow" onclick="addRow1('t10y2y')">+ 添加一周</button>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <div class="ref card" style="margin-top:16px">
+    <div class="section-h" style="margin:0 0 4px">
+      <span class="n">06</span><h2>数据源</h2>
+    </div>
+    <div class="src">
+      <a href="https://fiscaldata.treasury.gov/datasets/daily-treasury-statement/operating-cash-balance" target="_blank">DTS · TGA ↗</a>
+      <a href="https://www.newyorkfed.org/markets/desk-operations/reverse-repo" target="_blank">NY Fed · ON RRP ↗</a>
+      <a href="https://www.newyorkfed.org/markets/reference-rates/sofr" target="_blank">NY Fed · SOFR ↗</a>
+      <a href="https://www.newyorkfed.org/markets/reference-rates/effr" target="_blank">NY Fed · EFFR ↗</a>
+      <a href="https://www.newyorkfed.org/markets/desk-operations/repo" target="_blank">NY Fed · SRF ↗</a>
+      <a href="https://www.federalreserve.gov/releases/h41/current/" target="_blank">Fed · H.4.1 ↗</a>
+      <a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2" target="_blank">FRED · HY OAS ↗</a>
+      <a href="https://fred.stlouisfed.org/series/BAMLC0A0CM" target="_blank">FRED · IG OAS ↗</a>
+      <a href="https://fred.stlouisfed.org/series/NFCI" target="_blank">FRED · NFCI ↗</a>
+      <a href="https://fred.stlouisfed.org/series/T10Y2Y" target="_blank">FRED · 2s10s ↗</a>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <b>阈值触发说明.</b> 报警按可靠性分层:①<b>结构性水位</b>——ON RRP 是否触底,决定后续抽水是否 1:1 咬准备金(硬拐点);②<b>价格突破</b>——SOFR−IORB、EFFR−IORB、SRF 动用,是市场直接把"准备金稀缺"定价出来,最可靠;③<b>变化速率</b>——净流动性回撤与 TGA 重建斜率,偏软,只反映风险资产背景水位。准备金<b>绝对水平</b>是差触发器(舒适下限不可观测且随体系变大上移),故主报警放在价格信号、而非某个准备金数字。季末(3/6/9/12 月末)SOFR/SRF 走高属正常,工具会自动打上季末标记并弱化该报警——<b>冲高后不回落</b>才是 2019 式管道故障。<b>信用利差:</b>HY OAS 绝对水平 &lt;3.5% 偏自满、&gt;6% 转压力、&gt;8% 历史上与衰退高度共现;<b>变化速率比水平更重要</b>——急速走阔历史上与股市"投降式"抛售同步,缓慢低位徘徊不算警报。信用利差往往领先股市 2–4 周转向,可作为独立于持仓/流动性的第三维度验证。此为监控框架,非投资建议;阈值为区间与逻辑,非精确买卖信号。
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=(n,d=1)=>n==null||isNaN(n)?'—':n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+/* ---- 到期提醒通用函数 ---- */
+function daysSince(dateStr){
+  if(!dateStr) return 9999;
+  const d=new Date(dateStr+'T00:00:00');
+  if(isNaN(d)) return 9999;
+  return Math.floor((Date.now()-d.getTime())/86400000);
+}
+function ymAdd(ym,n){ let [y,m]=ym.split('-').map(Number); m+=n; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;} return `${y}-${String(m).padStart(2,'0')}`; }
+function currentYM(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function expectedLatestMonth(releaseDay){
+  const d=new Date(); const curYM=currentYM(); const prevYM=ymAdd(curYM,-1);
+  return d.getDate()>=releaseDay ? prevYM : ymAdd(prevYM,-1);
+}
+function isMonthlyDue(lastYM, releaseDay){ return !lastYM || lastYM < expectedLatestMonth(releaseDay); }
+// 按【日期】回看 N 天前的那一行(取最接近的),超出容差返回 null。
+// 索引回看(data[n-5])在数据有缺行/补录时会静默算错窗口长度,故必须按日期。
+function lookbackByDays(data, fromDate, targetDays, tolDays){
+  if(!data||data.length<2) return null;
+  const t0=new Date(fromDate+'T00:00:00Z').getTime();
+  if(isNaN(t0)) return null;
+  let best=null, bestErr=Infinity;
+  for(const r of data){
+    const t=new Date(r[0]+'T00:00:00Z').getTime();
+    if(isNaN(t)||t>=t0) continue;
+    const gap=(t0-t)/86400000;
+    const err=Math.abs(gap-targetDays);
+    if(err<bestErr){ bestErr=err; best={row:r, gapDays:Math.round(gap)}; }
+  }
+  if(!best || bestErr>tolDays) return null;   // 找不到落在容差内的行 → 宁可不报,也不用错窗口报
+  return best;
+}
+function setDue(ids, due){ ids.forEach(id=>{ const el=$(id); if(el) el.classList.toggle('hidden', !due); }); }
+
+const CFG={ // prefilled from FRED as of 2026-07-01/04
+  walcl:6724.6, reserves:2966.9, iorb:3.65, gdp:30300, floorPct:10, rrpFloor:100, tgaTarget:1000
+};
+const CFG_ASOF = '2026-07-04' // date the CFG defaults above were pulled
+
+
+
+const FRED_URL="https://fred-proxy.yifanl871.workers.dev";
+async function jget(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+
+async function fetchFRED(){
+    const d = await jget(FRED_URL);
+    return {
+        walcl:
+        d.WALCL.value / 1000,
+
+        reserves:
+        d.WRESBAL.value / 1000,
+
+        iorb:
+        d.IORB.value,
+
+        gdp:
+        d.GDP.value,
+
+        nfci:
+        d.NFCI,
+
+        t10y2y:
+        d.T10Y2Y,
+
+        hy:
+        d.BAMLH0A0HYM2,
+
+        ig:
+        d.BAMLC0A0CM
+    };
+}
+
+
+
+let LIQ_ASOF=CFG_ASOF;
+function loadInputs(){
+  const g=(id,k)=>{ const v=parseFloat($(id).value); return isNaN(v)?CFG[k]:v; };
+  return {
+    walcl:g('in_walcl','walcl'), reserves:g('in_reserves','reserves'),
+    iorb:g('in_iorb','iorb'), gdp:g('in_gdp','gdp'),
+    floorPct:g('in_floor','floorPct'), rrpFloor:g('in_rrpfloor','rrpFloor'), tgaTarget:g('in_tgatarget','tgaTarget')
+  };
+}
+// isData=true 时才刷新 as-of 日期。floorPct/rrpFloor 是【阈值旋钮】不是数据,
+// 调它们不该把过时的 WALCL/WRESBAL 标记成"刚更新过"(否则到期提醒会被静默关掉)。
+function saveInputs(isData){
+  try{
+    if(isData) LIQ_ASOF=new Date().toISOString().slice(0,10);
+    const inp=loadInputs();
+    localStorage.setItem('liqcalib', JSON.stringify({ ...inp, asof:LIQ_ASOF }));
+  }catch(e){}
+}
+function initInputs(){
+  let saved=null;
+  try{ saved=JSON.parse(localStorage.getItem('liqcalib')); }catch(e){}
+  if(saved){
+    $('in_walcl').value=saved.walcl; $('in_reserves').value=saved.reserves;
+    $('in_iorb').value=saved.iorb; $('in_gdp').value=saved.gdp;
+    $('in_floor').value=saved.floorPct; $('in_rrpfloor').value=saved.rrpFloor; $('in_tgatarget').value=saved.tgaTarget??CFG.tgaTarget;
+    LIQ_ASOF=saved.asof||CFG_ASOF;
+  } else {
+    $('in_walcl').value=CFG.walcl; $('in_reserves').value=CFG.reserves;
+    $('in_iorb').value=CFG.iorb; $('in_gdp').value=CFG.gdp;
+    $('in_floor').value=CFG.floorPct; $('in_rrpfloor').value=CFG.rrpFloor; $('in_tgatarget').value=CFG.tgaTarget;
+    LIQ_ASOF=CFG_ASOF;
+  }
+  const DATA_INPUTS=['in_walcl','in_reserves'];   // 仅 WALCL/WRESBAL 影响流动性水位时效性
+  const KNOB_INPUTS=['in_floor','in_rrpfloor','in_tgatarget'];       // 阈值/标注设置 → 不刷新 as-of
+  DATA_INPUTS.forEach(id=>$(id).addEventListener('input',()=>{saveInputs(true);render(LAST);}));
+  // in_iorb / in_gdp 是参数设置,改了不代表'数据刚更新了'→ 不刷新 as-of
+  ['in_iorb','in_gdp'].forEach(id=>$(id).addEventListener('input',()=>{saveInputs(false);render(LAST);}));
+  KNOB_INPUTS.forEach(id=>$(id).addEventListener('input',()=>{saveInputs(false);render(LAST);}));
+}
+
+function isQuarterEnd(dstr){
+  const d=new Date(dstr+'T00:00:00Z'); const m=d.getUTCMonth(); const day=d.getUTCDate();
+  const qMonthEnd=(m===2||m===5||m===8||m===11)&&day>=27;      // last days of Mar/Jun/Sep/Dec
+  const qMonthStart=(m===3||m===6||m===9||m===0)&&day<=3;      // first days of Apr/Jul/Oct/Jan
+  return qMonthEnd||qMonthStart;
+}
+
+async function jget(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+
+async function fetchTGA(){
+  const u="https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dts/operating_cash_balance?filter=account_type:eq:Treasury General Account (TGA) Closing Balance&sort=-record_date&page[size]=90";
+  const d=await jget(u);
+  const rows=d.data.map(r=>({date:r.record_date,val:parseFloat(r.open_today_bal)/1000})).filter(r=>!isNaN(r.val));
+  return {latest:rows[0], series:rows.slice().reverse()};
+}
+async function fetchRRP(){
+  const d=await jget("https://markets.newyorkfed.org/api/rp/reverserepo/all/results/last/25.json");
+  const ops=d.repo.operations.filter(o=>o.operationType==='Reverse Repo'&&o.term==='Overnight');
+  const rows=ops.map(o=>({date:o.operationDate,val:(+o.totalAmtAccepted)/1e9,cpty:o.acceptedCpty}));
+  return {latest:rows[0], series:rows.slice().reverse()};
+}
+async function fetchSRF(){
+  // 美联储每个交易日有【两笔】SRF操作(上午+下午),必须按日汇总,只取第一笔会漏计
+  const d=await jget("https://markets.newyorkfed.org/api/rp/all/all/results/last/40.json");
+  const ops=(d.repo?.operations||[]).filter(o=>o.operationType==='Repo'&&o.operationMethod==='Full Allotment'&&o.term==='Overnight');
+  // ops为空 = 接口正常但近期没有操作 → val:0 (无人动用,绿灯正确)
+  // 接口报错  = jget() 会 throw   → run() 的 catch 会把 srf 留成 undefined (srfOK=false,灰灯)
+  if(!ops.length) return {date:null, val:0, series:[]};
+  const byDate={};
+  ops.forEach(o=>{ byDate[o.operationDate]=(byDate[o.operationDate]||0)+(+o.totalAmtAccepted)/1e9; });
+  const dates=Object.keys(byDate).sort();
+  const latestDate=dates[dates.length-1];
+  return {date:latestDate, val:byDate[latestDate], series:dates.map(dt=>({date:dt,val:byDate[dt]}))};
+}
+async function fetchRate(kind){ // 'secured/sofr' or 'unsecured/effr'
+  // 拉 60 日:除均值外,接口还返回【百分位数】与【成交量】—— 尾部(p99)是均值掩盖不了的压力信号
+  const d=await jget(`https://markets.newyorkfed.org/api/rates/${kind}/last/60.json`);
+  const rows=d.refRates.map(r=>({
+    date:r.effectiveDate, val:r.percentRate,
+    tFrom:r.targetRateFrom, tTo:r.targetRateTo,
+    p1:r.percentPercentile1, p25:r.percentPercentile25,
+    p75:r.percentPercentile75, p99:r.percentPercentile99,
+    vol:r.volumeInBillions
+  }));
+  const r=rows[0];
+  return {date:r.date, val:r.val, tFrom:r.tFrom, tTo:r.tTo,
+          p99:r.p99, p1:r.p1, vol:r.vol,
+          series:rows.slice().reverse()}; // series oldest->newest
+}
+// 尾部离散度:p99 − 均值。均值可能因大量廉价成交而显得平静,尾部却已在抬价。
+// 用【自身近期历史】做基线(mean+2SD),而不是拍一个绝对阈值。
+function tailStats(series){
+  const t=series.filter(r=>r.p99!=null&&r.val!=null).map(r=>({date:r.date, bp:(r.p99-r.val)*100}));
+  if(t.length<10) return null;
+  const vals=t.map(x=>x.bp);
+  const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+  const sd=Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/vals.length)||1;
+  const last=t[t.length-1];
+  return {series:t, mean, sd, last:last.bp, z:(last.bp-mean)/sd, date:last.date};
+}
+let LAST=null;
+
+async function run() {
+    const btn = $('refreshBtn');
+    btn.classList.add('loading');
+
+    const out = {
+        err: {}
+    };
+
+    let fred = {};
+
+    try {
+        fred = await fetchFRED();
+        $('in_walcl').value = fred.walcl;
+        $('in_reserves').value = fred.reserves;
+        $('in_iorb').value = fred.iorb;
+        $('in_gdp').value = fred.gdp;
+    } catch (e) {
+        console.error("FRED error:", e);
+        out.err.fred = e.message;
+    }
+
+    const inp = {
+        ...loadInputs(),
+
+        walcl: fred.walcl,
+        reserves: fred.reserves,
+        iorb: fred.iorb,
+        gdp: fred.gdp,
+        nfci: fred.nfci.value,
+        t10y2y: fred.t10y2y.value,
+
+        hy: fred.hy.value,
+        ig: fred.ig.value
+    };
+
+
+    out.inp = inp;
+    out.fred = fred;
+
+    const jobs = [
+        ['tga', fetchTGA()],
+        ['rrp', fetchRRP()],
+        ['srf', fetchSRF()],
+        ['sofr', fetchRate('secured/sofr')],
+        ['effr', fetchRate('unsecured/effr')]
+    ];
+
+    await Promise.all(
+        jobs.map(async ([k, p]) => {
+            try {
+                out[k] = await p;
+            } catch (e) {
+                out.err[k] = e.message;
+            }
+        })
+    );
+
+    LAST = out;
+    render(out);
+    renderCredit();
+    renderMacro();
+    btn.classList.remove('loading');
+}
+
+function sparkline(svg,series,color){
+  if(!series||series.length<2){svg.innerHTML='';return;}
+  const w=+svg.getAttribute('width'),h=+svg.getAttribute('height'),p=4;
+  const vals=series.map(s=>s.val), mn=Math.min(...vals),mx=Math.max(...vals),rng=(mx-mn)||1;
+  const pts=series.map((s,i)=>{
+    const x=p+(w-2*p)*i/(series.length-1);
+    const y=h-p-(h-2*p)*(s.val-mn)/rng; return [x,y];
+  });
+  const dpath=pts.map((pt,i)=>(i?'L':'M')+pt[0].toFixed(1)+' '+pt[1].toFixed(1)).join(' ');
+  const area=dpath+` L ${pts[pts.length-1][0].toFixed(1)} ${h-p} L ${pts[0][0].toFixed(1)} ${h-p} Z`;
+  svg.innerHTML=`<path d="${area}" fill="${color}" opacity="0.12"/><path d="${dpath}" fill="none" stroke="${color}" stroke-width="1.6"/>`+
+    `<circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="2.4" fill="${color}"/>`;
+}
+
+function spreadChart(series,iorb,color,title){
+  // series: [{date,val}] oldest->newest (raw rate); convert to bp spread vs current iorb
+  const pts=series.map(r=>({date:r.date, bp:(r.val-iorb)*100}));
+  const W=300,H=110,pl=6,pr=6,pt=10,pb=16;
+  const vals=pts.map(p=>p.bp);
+  let mn=Math.min(...vals,0), mx=Math.max(...vals,0);
+  const pad=(mx-mn)*0.15||2; mn-=pad; mx+=pad;
+  const X=i=>pl+(W-pl-pr)*i/(pts.length-1);
+  const Y=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+  const line=pts.map((p,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(p.bp).toFixed(1)).join(' ');
+  const area=line+` L ${X(pts.length-1).toFixed(1)} ${Y(mn).toFixed(1)} L ${X(0).toFixed(1)} ${Y(mn).toFixed(1)} Z`;
+  const zeroY=Y(0).toFixed(1);
+  // quarter-end shading: vertical band behind qualifying points
+  let bands='';
+  pts.forEach((p,i)=>{
+    if(isQuarterEnd(p.date)){
+      const x0=X(Math.max(0,i-0.5)).toFixed(1), x1=X(Math.min(pts.length-1,i+0.5)).toFixed(1);
+      bands+=`<rect x="${x0}" y="${pt}" width="${(x1-x0).toFixed(1)}" height="${H-pt-pb}" fill="var(--amber)" opacity="0.08"/>`;
+    }
+  });
+  const last=pts[pts.length-1], lastX=X(pts.length-1), lastY=Y(last.bp);
+  const lastColor= last.bp>=0 ? 'var(--red)' : color;
+  const lab=i=>`<text class="cx" x="${X(i).toFixed(1)}" y="${H-4}" text-anchor="${i===0?'start':i===pts.length-1?'end':'middle'}">${pts[i].date.slice(5)}</text>`;
+  return `<div class="chartbox">
+    <div class="ctop"><span class="ctitle">${title}</span><span class="cnow" style="color:${lastColor}">${last.bp>=0?'+':''}${last.bp.toFixed(0)}bp</span></div>
+    <div class="cpct">近${pts.length}个交易日 · 0线=贴平IORB · 琥珀带=季末窗口</div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="aspect-ratio:${W}/${H}">
+      ${bands}
+      <line x1="${pl}" y1="${zeroY}" x2="${W-pr}" y2="${zeroY}" stroke="var(--red)" stroke-width="1" stroke-dasharray="3 3" opacity="0.55"/>
+      <path d="${area}" fill="${color}" opacity="0.12"/>
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="1.6"/>
+      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" fill="${lastColor}"/>
+      ${lab(0)}${lab(Math.floor((pts.length-1)/2))}${lab(pts.length-1)}
+    </svg></div>`;
+}
+
+function drawTgaChart(tgaSeries, tgaTarget){
+  const el=$('tgaChart'); if(!el) return;
+  // 周频重采样(ISO week, 取每周最后一个交易日)
+  function isoWeekKey(dstr){
+    const d=new Date(dstr+'T00:00:00Z');
+    const jan4=new Date(Date.UTC(d.getUTCFullYear(),0,4));
+    const w=Math.ceil(((d-jan4)/86400000+jan4.getUTCDay()+1)/7);
+    return d.getUTCFullYear()+'-'+String(w).padStart(2,'0');
+  }
+  const wk={};
+  tgaSeries.forEach(r=>{ const k=isoWeekKey(r.date); if(!wk[k]||r.date>wk[k].date) wk[k]=r; });
+  const pts=Object.values(wk).sort((a,b)=>a.date<b.date?-1:1);
+  if(pts.length<3){ el.innerHTML='<div style="padding:14px 16px;font-family:var(--mono);font-size:11px;color:var(--txt-3)">数据不足，少于3个周频点</div>'; return; }
+
+  const W=860, H=180, pl=50, pr=16, pt=16, pb=28;
+  const vals=pts.map(p=>p.val);
+  let mn=Math.min(...vals)*0.92, mx=Math.max(...vals,tgaTarget||0)*1.06;
+  const X=i=>pl+(W-pl-pr)*i/(pts.length-1);
+  const Y=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+
+  // y-axis gridlines
+  const steps=4;
+  let grid='', yaxis='';
+  for(let s=0;s<=steps;s++){
+    const v=mn+(mx-mn)*s/steps, y=Y(v);
+    grid+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W-pr}" y2="${y.toFixed(1)}" stroke="var(--line-soft)" stroke-width="1"/>`;
+    yaxis+=`<text class="cx" x="${pl-6}" y="${(y+3).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+
+  // x-axis labels (~6 ticks)
+  let xaxis='';
+  const ticks=Math.min(6,pts.length-1);
+  for(let t=0;t<=ticks;t++){
+    const i=Math.round((pts.length-1)*t/ticks);
+    xaxis+=`<text class="cx" x="${X(i).toFixed(1)}" y="${H-8}" text-anchor="${t===0?'start':t===ticks?'end':'middle'}">${pts[i].date.slice(0,7)}</text>`;
+  }
+
+  // area + line
+  const linePath=pts.map((p,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(p.val).toFixed(1)).join(' ');
+  const areaPath=linePath+` L ${X(pts.length-1).toFixed(1)} ${Y(mn).toFixed(1)} L ${X(0).toFixed(1)} ${Y(mn).toFixed(1)} Z`;
+
+  // last point dot
+  const last=pts[pts.length-1], lastX=X(pts.length-1), lastY=Y(last.val);
+
+  // QRA target line
+  let targetLine='';
+  if(tgaTarget){
+    const ty=Y(tgaTarget).toFixed(1);
+    targetLine=`<line x1="${pl}" y1="${ty}" x2="${W-pr}" y2="${ty}" stroke="var(--water)" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.8"/>
+    <text class="cx" x="${W-pr-2}" y="${(+ty-4).toFixed(1)}" text-anchor="end" style="fill:var(--water);font-weight:600">QRA目标 ${Math.round(tgaTarget)}B</text>`;
+  }
+
+  // tax-season shading: April (month index 3) each year
+  let taxShade='';
+  pts.forEach((p,i)=>{
+    if(i<pts.length-1 && p.date.slice(5,7)==='04'){
+      const x0=X(i).toFixed(1), x1=X(i+1).toFixed(1);
+      taxShade+=`<rect x="${x0}" y="${pt}" width="${(+x1-+x0).toFixed(1)}" height="${H-pt-pb}" fill="var(--amber)" opacity="0.06"/>`;
+    }
+  });
+
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:auto;aspect-ratio:${W}/${H};display:block">
+    ${grid}${taxShade}
+    <line x1="${pl}" y1="${pt}" x2="${pl}" y2="${H-pb}" stroke="var(--line)" stroke-width="1"/>
+    ${targetLine}
+    <path d="${areaPath}" fill="var(--water)" opacity="0.08"/>
+    <path d="${linePath}" fill="none" stroke="var(--water)" stroke-width="2"/>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3.5" fill="var(--water)"/>
+    ${yaxis}${xaxis}
+  </svg>
+  <div style="padding:4px 16px 2px;font-family:var(--mono);font-size:10px;color:var(--txt-3)">
+    最新 <b style="color:var(--txt)">${last.date} · ${last.val.toFixed(0)}B</b>${tgaTarget?` · QRA目标 ${Math.round(tgaTarget)}B · 距目标 ${(tgaTarget-last.val>0?'+':'')}${Math.round(tgaTarget-last.val)}B`:''}
+    <span style="margin-left:12px;color:var(--amber);opacity:.7">▮ 4月税季</span>
+    <span style="margin-left:8px;color:var(--water);opacity:.7">┄ QRA季度目标</span>
+  </div>`;
+}
+
+/* ── 杠杆走势图 ─────────────────────────────────────────── */
+function drawLevTrendChart(){
+  const el=$('levTrendChart'); if(!el) return;
+  const finraData=FINRA.length?FINRA:FINRA_DEFAULT.map(r=>r.slice());
+  const ibkrData=IBKR.length?IBKR:IBKR_DEFAULT.map(r=>r.slice());
+  if(finraData.length<3){ el.innerHTML='<div style="padding:14px;font-family:var(--mono);font-size:11px;color:var(--txt-3)">FINRA数据不足</div>'; return; }
+
+  // ── helpers ──────────────────────────────────────────────────────────
+  function momPct(data,i){
+    if(i<1) return null;
+    const prev=data[i-1][1]; if(!prev||prev===0) return null;
+    return (data[i][1]/prev-1)*100;
+  }
+  function isAdjacent(ym0,ym1){
+    let [y,m]=ym0.split('-').map(Number); m++; if(m>12){m=1;y++;}
+    return `${y}-${String(m).padStart(2,'0')}`===ym1;
+  }
+  const fmtN=(n,d=1)=>n==null?'—':(n>=0?'+':'')+n.toFixed(d);
+
+  // ── shared SVG helpers ────────────────────────────────────────────────
+  function makeChart(W,H,pl,pr,pt,pb){
+    const X=(i,n)=>pl+(W-pl-pr)*i/(n-1||1);
+    const Y=(v,mn,mx)=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+    return {X,Y,W,H,pl,pr,pt,pb};
+  }
+
+  // ── Chart A: FINRA debt level + MoM bars ─────────────────────────────
+  function chartDebt(data, label, debtColor){
+    const n=data.length;
+    const debtV=data.map(r=>r[1]);
+    const momV=data.map((r,i)=>momPct(data,i));
+    const {X,Y,W,H,pl,pr,pt,pb}=makeChart(860,200,56,16,12,22);
+
+    // debt sub-chart: top 55%
+    const dH=Math.round(H*0.58), bH=H-dH-6;
+    const dMn=Math.min(...debtV)*0.9, dMx=Math.max(...debtV)*1.06;
+    const Yd=v=>pt+(dH-pt-8)*(1-(v-dMn)/(dMx-dMn));
+    const lineD=debtV.map((v,i)=>(i?'L':'M')+X(i,n).toFixed(1)+' '+Yd(v).toFixed(1)).join(' ');
+    const areaD=lineD+` L${X(n-1,n).toFixed(1)} ${(dH-4).toFixed(1)} L${X(0,n).toFixed(1)} ${(dH-4).toFixed(1)} Z`;
+
+    // MoM bars: bottom 40%
+    const bOff=dH+6, bMx=Math.max(12,...momV.filter(v=>v!=null).map(Math.abs));
+    const Ym=v=>bOff+(bH-4)*(1-(v+bMx)/(2*bMx));
+    const ym0=Ym(0), bw=Math.max(5,(W-pl-pr)/n*0.6);
+    let bars='', xlD='', ylD='', ylM='', momDots='';
+
+    data.forEach((r,i)=>{
+      const v=momV[i];
+      if(v!=null){
+        const col=v>10?'var(--red)':v>5?'var(--amber)':v<-3?'var(--water)':'var(--txt-3)';
+        const x=X(i,n), y1=Math.min(ym0,Ym(v)), bLen=Math.abs(Ym(v)-ym0);
+        bars+=`<rect x="${(x-bw/2).toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${bLen.toFixed(1)}" fill="${col}" opacity="0.82" rx="2"/>`;
+        // value label for notable bars
+        if(Math.abs(v)>=5)
+          bars+=`<text class="cx" x="${x.toFixed(1)}" y="${(v>0?Ym(v)-3:Ym(v)+10).toFixed(1)}" text-anchor="middle" style="font-size:8px;fill:${col};font-weight:600">${fmtN(v,1)}%</text>`;
+      }
+      // x labels (every 2nd or 3rd)
+      const step=n>12?3:2;
+      if(i%step===0||i===n-1)
+        xlD+=`<text class="cx" x="${X(i,n).toFixed(1)}" y="${H-5}" text-anchor="${i===0?'start':i===n-1?'end':'middle'}" style="font-size:8.5px">${r[0]}</text>`;
+    });
+
+    // debt y-axis
+    [dMn,dMn+(dMx-dMn)/2,dMx].forEach((v,si)=>{
+      ylD+=`<text class="cx" x="${pl-5}" y="${(Yd(v)+3).toFixed(1)}" text-anchor="end" style="font-size:8.5px">${Math.round(v)}</text>`;
+    });
+    // MoM y-axis
+    [-10,0,10].forEach(v=>{
+      if(Math.abs(v)<=bMx*1.1)
+        ylM+=`<text class="cx" x="${pl-5}" y="${(Ym(v)+3).toFixed(1)}" text-anchor="end" style="font-size:8px;fill:var(--txt-3)">${v>0?'+':''}${v}%</text>`;
+    });
+
+    // last point annotation
+    const last=debtV[n-1], lastMom=momV[n-1];
+    const lastX=X(n-1,n), lastY=Yd(last);
+    const ann=`<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" fill="${debtColor}"/>
+      <text class="cx" x="${(lastX-5).toFixed(1)}" y="${(lastY-8).toFixed(1)}" text-anchor="end" style="font-size:9px;fill:${debtColor};font-weight:700">${last.toFixed(0)}B</text>
+      ${lastMom!=null?`<text class="cx" x="${(lastX-5).toFixed(1)}" y="${(lastY-19).toFixed(1)}" text-anchor="end" style="font-size:8.5px;fill:${lastMom>5?'var(--red)':lastMom<0?'var(--water)':'var(--txt-3)'};font-weight:600">MoM ${fmtN(lastMom,1)}%</text>`:''}`;
+
+    // divider line
+    const divider=`<line x1="${pl}" y1="${(dH+2).toFixed(1)}" x2="${W-pr}" y2="${(dH+2).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+    // zero line for MoM
+    const mZero=`<line x1="${pl}" y1="${ym0.toFixed(1)}" x2="${W-pr}" y2="${ym0.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+    // debt grid
+    const dGrid=`<line x1="${pl}" y1="${Yd(dMn+(dMx-dMn)/2).toFixed(1)}" x2="${W-pr}" y2="${Yd(dMn+(dMx-dMn)/2).toFixed(1)}" stroke="var(--line-soft)" stroke-width="1"/>`;
+
+    // section labels
+    const secLabels=`
+      <text class="cx" x="${pl+4}" y="${pt+11}" style="font-size:8.5px;fill:var(--txt-3)">${label} 保证金 $B（左轴）</text>
+      <text class="cx" x="${pl+4}" y="${(bOff+12).toFixed(1)}" style="font-size:8.5px;fill:var(--txt-3)">月环比坡度 %</text>`;
+
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;display:block;aspect-ratio:${W}/${Math.round(H)}">
+      ${dGrid}
+      <path d="${areaD}" fill="${debtColor}" opacity="0.08"/>
+      <path d="${lineD}" fill="none" stroke="${debtColor}" stroke-width="2.2"/>
+      ${ann}${divider}${mZero}${bars}${ylD}${ylM}${xlD}
+      ${secLabels}
+    </svg>`;
+  }
+
+  // ── Chart B: IBKR with gap annotation ────────────────────────────────
+  function chartIbkr(data){
+    const n=data.length;
+    const loanV=data.map(r=>r[1]);
+    // MoM with gap awareness
+    const momV=data.map((r,i)=>{
+      if(i===0) return {v:null,gap:false};
+      const v=momPct(data,i);
+      return {v, gap:!isAdjacent(data[i-1][0],data[i][0])};
+    });
+
+    const {X,Y,W,H,pl,pr,pt,pb}=makeChart(860,200,56,16,12,22);
+    const dH=Math.round(H*0.58), bH=H-dH-6;
+    const lMn=Math.min(...loanV)*0.85, lMx=Math.max(...loanV)*1.1;
+    const Yl=v=>pt+(dH-pt-8)*(1-(v-lMn)/(lMx-lMn));
+    const lineL=loanV.map((v,i)=>(i?'L':'M')+X(i,n).toFixed(1)+' '+Yl(v).toFixed(1)).join(' ');
+    const areaL=lineL+` L${X(n-1,n).toFixed(1)} ${(dH-4).toFixed(1)} L${X(0,n).toFixed(1)} ${(dH-4).toFixed(1)} Z`;
+
+    const bOff=dH+6, bMx=Math.max(12,...momV.map(m=>m.v!=null?Math.abs(m.v):0));
+    const Ym=v=>bOff+(bH-4)*(1-(v+bMx)/(2*bMx));
+    const ym0=Ym(0), bw=Math.max(5,(W-pl-pr)/n*0.6);
+    let bars='', xlD='', ylL='', ylM='';
+
+    data.forEach((r,i)=>{
+      const {v,gap}=momV[i];
+      const xc=X(i,n);
+      if(v!=null){
+        const dispV = gap ? null : v; // 跨缺口不画条形
+        if(dispV!=null){
+          const col=dispV>12?'var(--red)':dispV>6?'var(--amber)':dispV<-3?'var(--water)':'var(--txt-3)';
+          const y1=Math.min(ym0,Ym(dispV)), bLen=Math.abs(Ym(dispV)-ym0);
+          bars+=`<rect x="${(xc-bw/2).toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${bLen.toFixed(1)}" fill="${col}" opacity="0.82" rx="2"/>`;
+          if(Math.abs(dispV)>=5)
+            bars+=`<text class="cx" x="${xc.toFixed(1)}" y="${(dispV>0?Ym(dispV)-3:Ym(dispV)+10).toFixed(1)}" text-anchor="middle" style="font-size:8px;fill:${col};font-weight:600">${fmtN(dispV,1)}%</text>`;
+        } else {
+          // 缺口：画灰色虚线条 + 标注
+          bars+=`<rect x="${(xc-bw/2).toFixed(1)}" y="${(bOff+4).toFixed(1)}" width="${bw.toFixed(1)}" height="${(bH-8).toFixed(1)}" fill="var(--line)" opacity="0.3" rx="2"/>`;
+          bars+=`<text class="cx" x="${xc.toFixed(1)}" y="${(bOff+bH/2+4).toFixed(1)}" text-anchor="middle" style="font-size:7.5px;fill:var(--txt-3)">缺月</text>`;
+        }
+      }
+      xlD+=`<text class="cx" x="${xc.toFixed(1)}" y="${H-5}" text-anchor="${i===0?'start':i===n-1?'end':'middle'}" style="font-size:8.5px">${r[0]}</text>`;
+    });
+
+    [lMn,lMn+(lMx-lMn)/2,lMx].forEach(v=>{
+      ylL+=`<text class="cx" x="${pl-5}" y="${(Yl(v)+3).toFixed(1)}" text-anchor="end" style="font-size:8.5px">${v.toFixed(0)}</text>`;
+    });
+    [-10,0,10].forEach(v=>{
+      if(Math.abs(v)<=bMx*1.1)
+        ylM+=`<text class="cx" x="${pl-5}" y="${(Ym(v)+3).toFixed(1)}" text-anchor="end" style="font-size:8px;fill:var(--txt-3)">${v>0?'+':''}${v}%</text>`;
+    });
+
+    const last=loanV[n-1], lastX=X(n-1,n), lastY=Yl(last);
+    const ann=`<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" fill="var(--amber)"/>
+      <text class="cx" x="${(lastX-5).toFixed(1)}" y="${(lastY-8).toFixed(1)}" text-anchor="end" style="font-size:9px;fill:var(--amber);font-weight:700">${last.toFixed(1)}B</text>`;
+    const divider=`<line x1="${pl}" y1="${(dH+2).toFixed(1)}" x2="${W-pr}" y2="${(dH+2).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+    const mZero=`<line x1="${pl}" y1="${ym0.toFixed(1)}" x2="${W-pr}" y2="${ym0.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+    const secLabels=`
+      <text class="cx" x="${pl+4}" y="${pt+11}" style="font-size:8.5px;fill:var(--txt-3)">IBKR 保证金贷款 $B</text>
+      <text class="cx" x="${pl+4}" y="${(bOff+12).toFixed(1)}" style="font-size:8.5px;fill:var(--txt-3)">月环比坡度 % · 灰色=数据缺口</text>`;
+
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;display:block;aspect-ratio:${W}/${Math.round(H)}">
+      <path d="${areaL}" fill="var(--amber)" opacity="0.08"/>
+      <path d="${lineL}" fill="none" stroke="var(--amber)" stroke-width="2.2"/>
+      ${ann}${divider}${mZero}${bars}${ylL}${ylM}${xlD}${secLabels}
+    </svg>`;
+  }
+
+  // ── Chart C: credit balance net (独立，不和债务混) ───────────────────
+  function chartCreditNet(data){
+    const n=data.length;
+    const netV=data.map(r=>r[2]-r[1]);
+    const {X,Y,W,H,pl,pr,pt,pb}=makeChart(860,130,56,16,12,22);
+    const mn=Math.min(...netV)*1.1, mx=Math.max(...netV,0)*1.1||50;
+    const Yv=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+    const y0=Yv(0);
+
+    // area fill: red when negative
+    let shade='';
+    for(let i=0;i<n-1;i++){
+      const x0=X(i,n), x1=X(i+1,n), v0=netV[i], v1=netV[i+1];
+      shade+=`<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} L${x0.toFixed(1)} ${Yv(v0).toFixed(1)} L${x1.toFixed(1)} ${Yv(v1).toFixed(1)} L${x1.toFixed(1)} ${y0.toFixed(1)} Z" fill="${v0<0?'rgba(190,44,44,.18)':'rgba(10,113,120,.15)'}"/>`;
+    }
+    const line=netV.map((v,i)=>(i?'L':'M')+X(i,n).toFixed(1)+' '+Yv(v).toFixed(1)).join(' ');
+    const last=netV[n-1], lastX=X(n-1,n), lastY=Yv(last);
+    const ann=`<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" fill="var(--red)"/>
+      <text class="cx" x="${(lastX-5).toFixed(1)}" y="${(lastY-7).toFixed(1)}" text-anchor="end" style="font-size:9px;fill:var(--red);font-weight:700">${last.toFixed(0)}B</text>`;
+
+    let yl='', xl='';
+    [mn, mn+(mx-mn)/2, 0].forEach(v=>{
+      if(v>=mn-1) yl+=`<text class="cx" x="${pl-5}" y="${(Yv(v)+3).toFixed(1)}" text-anchor="end" style="font-size:8.5px;fill:${v<0?'var(--red)':'var(--txt-3)'}">${Math.round(v)}</text>`;
+    });
+    const step=n>12?3:2;
+    data.forEach((r,i)=>{ if(i%step===0||i===n-1) xl+=`<text class="cx" x="${X(i,n).toFixed(1)}" y="${H-5}" text-anchor="${i===0?'start':i===n-1?'end':'middle'}" style="font-size:8.5px">${r[0]}</text>`; });
+
+    const zeroLine=`<line x1="${pl}" y1="${y0.toFixed(1)}" x2="${W-pr}" y2="${y0.toFixed(1)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 2"/>`;
+    const lbl=`<text class="cx" x="${pl+4}" y="${pt+11}" style="font-size:8.5px;fill:var(--txt-3)">信用余额净值 = 自由信用 − 保证金债务 $B · 红=净负债（缓冲越薄）</text>`;
+
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;display:block;aspect-ratio:${W}/${H}">
+      ${shade}${zeroLine}
+      <path d="${line}" fill="none" stroke="var(--red)" stroke-width="2"/>
+      ${ann}${yl}${xl}${lbl}
+    </svg>`;
+  }
+
+  // ── 组装三张图 ────────────────────────────────────────────────────────
+  const hasIbkr=ibkrData.length>=2;
+  const hasCreditCols=finraData[0].length>=3;
+
+  el.innerHTML=`
+    <div style="padding:4px 0 2px">
+      <div style="padding:0 16px 6px;font-family:var(--mono);font-size:10px;color:var(--txt-3);font-weight:600">
+        FINRA 全市场保证金 · ${finraData[0][0]} → ${finraData[finraData.length-1][0]}
+      </div>
+      ${chartDebt(finraData,'FINRA','var(--water)')}
+    </div>
+    ${hasIbkr?`<div style="padding:10px 0 2px;border-top:1px solid var(--line-soft)">
+      <div style="padding:0 16px 6px;font-family:var(--mono);font-size:10px;color:var(--txt-3);font-weight:600">
+        IBKR 保证金贷款 · 领先FINRA约3周 · ${ibkrData[0][0]} → ${ibkrData[ibkrData.length-1][0]}
+      </div>
+      ${chartIbkr(ibkrData)}
+    </div>`:''}
+    ${hasCreditCols?`<div style="padding:10px 0 2px;border-top:1px solid var(--line-soft)">
+      <div style="padding:0 16px 6px;font-family:var(--mono);font-size:10px;color:var(--txt-3);font-weight:600">
+        信用余额净值 · 缓冲厚度趋势
+      </div>
+      ${chartCreditNet(finraData)}
+    </div>`:''}
+    <div style="padding:4px 16px 8px;font-family:var(--mono);font-size:9.5px;color:var(--txt-3);display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line-soft);margin-top:4px">
+      <span><b style="color:var(--red)">█</b> 月环比>+10%（强加速）</span>
+      <span><b style="color:var(--amber)">█</b> 月环比+5~10%（加速）</span>
+      <span><b style="color:var(--txt-3)">█</b> 月环比0~+5%（温和）</span>
+      <span><b style="color:var(--water)">█</b> 月环比<0（去杠杆）</span>
+      <span><b style="color:var(--txt-3);opacity:.4">█</b> 灰色=IBKR数据缺口</span>
+    </div>`;
+}
+
+function render(o){
+  if(!o) return;
+  const inp=o.inp||loadInputs();
+  const tga=o.tga?.latest?.val, rrp=o.rrp?.latest?.val;
+  const srf=o.srf?.val;            // null = 取数失败/无数据 → 绝不能当成 0(否则静默显示"正常")
+  const srfOK=(srf!=null);
+  const sofr=o.sofr?.val, effr=o.effr?.val, iorb=inp.iorb;
+
+  // ---- IORB 一致性校验:降息后若忘记更新手动 IORB,所有利差信号会静默失真 ----
+  // EFFR 接口返回当日目标区间;IORB 必须落在区间内(通常贴近上沿),否则报警
+  let iorbWarn=null;
+  const tFrom=o.effr?.tFrom, tTo=o.effr?.tTo;
+  if(tFrom!=null && tTo!=null && (iorb < tFrom-0.02 || iorb > tTo+0.02)){
+    iorbWarn=`手动 IORB ${fmt(iorb,2)}% 落在当前目标区间 ${fmt(tFrom,2)}–${fmt(tTo,2)}% 之外 —— 美联储可能已调息,请更新 IORB,否则所有利差报警失真`;
+  }
+  const iorbBanner=$('iorbWarn');
+  if(iorbBanner){ iorbBanner.textContent=iorbWarn||''; iorbBanner.classList.toggle('show', !!iorbWarn); }
+
+  // 到期提醒:净流动性校准数据按周(H.4.1周四)更新,超过10天视为过期
+  setDue(['dueCalibSum'], daysSince(LIQ_ASOF) > 10);
+
+  // net liquidity
+  const net=(tga!=null&&rrp!=null)?(inp.walcl-tga-rrp):null;
+  $('netVal').innerHTML=(net!=null?fmt(net,0):'—')+'<span class="unit">B</span>';
+  $('netFormula').innerHTML=`${fmt(inp.walcl,0)} − ${tga!=null?fmt(tga,0):'—'} − ${rrp!=null?fmt(rrp,1):'—'} &nbsp; ($B)`;
+
+  // net-liq proxy series from TGA+RRP daily (WALCL held ~const intra-week) -> 5d flow
+  let proxy=[];
+  if(o.tga?.series){
+    // RRP 序列比 TGA 短。此前用"最新RRP"初始化 lastr,导致最老的几个TGA日期被未来值回填(前视泄漏)。
+    // 改为:只保留两者日期都覆盖的区间,用"当日或之前最近一笔"RRP,取不到就丢弃该点。
+    const rseries=(o.rrp?.series||[]);
+    const rmap={}; rseries.forEach(r=>rmap[r.date]=r.val);
+    const rrpStart = rseries.length? rseries[0].date : null;
+    let lastr=null;
+    proxy=o.tga.series
+      .filter(t=>rrpStart && t.date>=rrpStart)          // 丢掉 RRP 尚无数据的更早日期,不做回填
+      .map(t=>{ if(rmap[t.date]!=null) lastr=rmap[t.date]; return lastr==null?null:{date:t.date,val:inp.walcl-t.val-lastr}; })
+      .filter(Boolean);
+  }
+  sparkline($('netSpark'),proxy.slice(-20),'#0A7178');
+  // TGA 周度走势图 (uses same series from fetchTGA, already available)
+  if(o.tga?.series) drawTgaChart(o.tga.series, inp.tgaTarget);
+  if(proxy.length>=6){
+    const a=proxy[proxy.length-6].val,b=proxy[proxy.length-1].val,dd=b-a;
+    const el=$('netDelta'); const dn=dd<0;
+    el.innerHTML=`近5日流向 <b style="color:${dn?'var(--amber)':'var(--water)'}">${dd>=0?'+':''}${fmt(dd,0)}B</b> ${dn?'抽水':'放水'}`;
+    el.style.borderColor=dn?'var(--amber)':'var(--line)';
+  }
+
+  // ---- vessels ----
+  const qend = o.sofr?.date? isQuarterEnd(o.sofr.date):false;
+  const rrpDrained = rrp!=null && rrp<=inp.rrpFloor;
+  const vessels=[
+    {name:'准备金余额',code:'WRESBAL · ✎手动',val:inp.reserves,max:3600,color:'water',
+     meta:`占 GDP ${fmt(inp.reserves/inp.gdp*100,1)}%`, chg:null},
+    {name:'财政部账户',code:'TGA · Treasury DTS',val:tga,max:1000,color: (tgaTrendUp(o)?'amber':'water'),
+     meta:o.tga?.latest?.date||'', _tgaChg:tgaChg(o), mark2:inp.tgaTarget, markMax2:1000, markLabel2:'QRA目标'},
+    {name:'隔夜逆回购',code:'ON RRP · NY Fed',val:rrp,max:400,color: rrpDrained?'red':'water',
+     meta:o.rrp?.latest?(`${o.rrp.latest.cpty} 家 · ${o.rrp.latest.date}`):'', chg:null,
+     mark: inp.rrpFloor, markMax:400}
+  ];
+  $('vessels').innerHTML=vessels.map(v=>{
+    const pct=v.val!=null?Math.max(2,Math.min(100,v.val/v.max*100)):0;
+    const markPct=v.mark!=null?(v.mark/v.markMax*100):null;
+    return `<div class="vessel">
+      <div class="tube">
+        ${markPct!=null?`<div class="mark" style="bottom:${markPct}%"><span>排空线</span></div>`:''}
+        ${(v.mark2!=null&&v.markMax2)?`<div class="mark mark-target" style="bottom:${Math.max(2,Math.min(98,v.mark2/v.markMax2*100)).toFixed(1)}%"><span>${v.markLabel2||'目标'}</span></div>`:''}
+        <div class="fill ${v.color}" style="height:${pct}%"><div class="surface" style="top:0"></div></div>
+      </div>
+      <div class="vinfo">
+        <div><div class="vname">${v.name}</div><div class="vcode">${v.code}</div></div>
+        <div class="vval">${v.val!=null?fmt(v.val,v.val<10?2:0):'—'}<span class="u"> B</span></div>
+        <div class="vmeta"><span>${v.meta||''}</span>${v._tgaChg!=null?`<span class="chg ${v._tgaChg.val<0?'down':'up'}">${v._tgaChg.val>=0?'+':''}${fmt(v._tgaChg.val,0)}B/${v._tgaChg.days}d</span>`:''}</div>
+      </div></div>`;
+  }).join('');
+
+  // ---- stage ----
+  const stName=$('stageName'), stDesc=$('stageDesc'), track=$('stageTrack').children;
+  if(rrp==null){ stName.textContent='—'; }
+  else if(!rrpDrained){
+    stName.innerHTML='阶段 A · 缓冲垫尚在';
+    stDesc.innerHTML=`ON RRP 仍有 <b>${fmt(rrp,0)}B</b>,高于排空阈值 ${fmt(inp.rrpFloor,0)}B。抽水主要被这层缓冲吸收,准备金稳定,价格信号大概率不亮 —— <b>重点盯上方水位表</b>。`;
+    track[0].className='seg on'; track[1].className='seg';
+  } else {
+    stName.innerHTML='阶段 B · 缓冲垫已排空';
+    stDesc.innerHTML=`ON RRP 仅 <b>${fmt(rrp,1)}B</b>,已排空。后续 QT / TGA 抽水开始 1:1 咬准备金 —— <b>价格表已布防</b>,紧盯 SOFR−IORB 与 SRF。`;
+    track[0].className='seg on'; track[1].className='seg on b';
+  }
+
+  // ---- water panel rows ----
+  const tgaUp=tgaTrendUp(o);
+  const netDD = proxy.length>=6 ? (proxy[proxy.length-1].val-proxy[proxy.length-6].val) : null;
+  const resPct = inp.reserves/inp.gdp*100;
+  const waterRows=[
+    {name:'TGA 方向',code:'抽水/放水', val:tga!=null?fmt(tga,0)+'B':'—',
+     st: tgaUp?'amber':'ok', thr:'持续上冲逼近季度目标=抽水',
+     logic:`TGA 上升=钱冻结在美联储、离开银行体系;税季(1/4/6/9 月中)为可预测脉冲。${inp.tgaTarget?` 当前 QRA 季度目标余额 ${fmt(inp.tgaTarget,0)}B(7月下旬峰值),现值 ${tga!=null?fmt(tga,0)+'B':'—'},${tga!=null&&inp.tgaTarget?(tga<inp.tgaTarget?` 距目标仍有 ${fmt(inp.tgaTarget-tga,0)}B 上升空间,意味着还有持续抽水压力`:`已达/超目标,建库压力减轻`):''}。`:''}`},
+    {name:'净流动性斜率',code:'5日流向', val:netDD!=null?(netDD>=0?'+':'')+fmt(netDD,0)+'B':'—',
+     st: netDD!=null&&netDD<-150?'amber':'ok', thr:'4–6 周快速回撤为警',
+     logic:'看斜率不看绝对值;快速抽水时风险资产历史上有感。方向比水位重要。'},
+    {name:'准备金 / GDP',code:'WRESBAL÷GDP', val:fmt(resPct,1)+'%',
+     st: resPct<inp.floorPct-1.5?'red':(resPct<inp.floorPct?'amber':'ok'), thr:`舒适约 ${fmt(inp.floorPct,0)}–11%`,
+     logic:'参考项,不作主触发。2019 回购危机时约占 GDP 7%,但临界点会漂移。'}
+  ];
+  $('waterRows').innerHTML=waterRows.map(rowHTML).join('');
+
+  // ---- price panel (gated) ----
+  const panel=$('panelPrice'), arm=$('priceArm');
+  const sofrSpread = (sofr!=null)?(sofr-iorb)*100:null;   // bp
+  const effrSpread = (effr!=null)?(effr-iorb)*100:null;
+  const softenQ = qend; // quarter-end softening
+  function priceStatus(spread){
+    if(spread==null) return 'mute';
+    if(spread>=0) return softenQ?'amber':'red';   // 季末:红→琥珀弱化
+    if(spread>=-2) return 'amber';                // 贴近 IORB
+    return 'ok';
+  }
+  // valcls 与状态灯保持一致(此前季末只弱化了灯、数值仍显红,自相矛盾)
+  function priceValcls(spread){
+    if(spread==null) return '';
+    if(spread>=0) return softenQ?'warn':'bad';
+    if(spread>=-2) return 'warn';
+    return 'good';
+  }
+  // SRF:取数失败绝不能当作 0(那是"一切正常"的绿灯,最危险的静默失败)
+  const srfStatus = !srfOK ? 'mute' : (srf>0.05 ? (softenQ?'amber':'red') : 'ok');
+
+  if(!rrpDrained){ panel.classList.add('locked'); arm.className='arm locked'; arm.textContent='待布防'; }
+  else { panel.classList.remove('locked'); arm.className='arm armed'; arm.textContent='已布防'; }
+
+  const priceRows=[
+    {name:'SOFR − IORB',code:o.sofr?.date||'', val: sofrSpread!=null?(sofrSpread>=0?'+':'')+fmt(sofrSpread,0)+'bp':'—',
+     st: priceStatus(sofrSpread), thr:'持续 ≥ 0(非季末)=准备金变紧',
+     valcls: priceValcls(sofrSpread),
+     logic:`SOFR ${sofr!=null?fmt(sofr,2)+'%':'—'} vs IORB ${fmt(iorb,2)}%。常态应在 IORB 下方几 bp;站上=银行为现金抬价。`+(softenQ?' ⚠ 季末,已弱化。':'')},
+    {name:'EFFR − IORB',code:o.effr?.date||'', val: effrSpread!=null?(effrSpread>=0?'+':'')+fmt(effrSpread,0)+'bp':'—',
+     st: priceStatus(effrSpread), thr:'向上贴近/超 IORB 为警',
+     valcls: priceValcls(effrSpread),
+     logic:`EFFR ${effr!=null?fmt(effr,2)+'%':'—'},目标区间 ${(tFrom!=null&&tTo!=null)?fmt(tFrom,2)+'–'+fmt(tTo,2):'—'}%。与 SOFR 互相印证。`},
+    {name:'SRF 动用量',code:o.srf?.date||'常备回购', val: srfOK?fmt(srf,3)+'B':'取数失败',
+     st: srfStatus, thr:'非季末有意义动用=最硬稀缺信号',
+     valcls: !srfOK?'':(srf>0.05?(softenQ?'warn':'bad'):'good'),
+     logic:(srfOK
+       ? 'SRF 是后备水龙头,平时无人用;一旦有人按封顶利率借现金=市场借不到钱。(已按日汇总当天上午+下午两笔操作)'
+       : '<b>取数失败,当前状态未知</b> —— 不代表"无人动用"。请点刷新重试,或直接查纽约联储 SRF 页面。')
+       +(softenQ&&srfOK?' ⚠ 季末,已弱化。':'')}
+  ];
+
+  // ---- 新增:SOFR 尾部离散度 —— 均值平静≠没有压力 ----
+  const tail=tailStats(o.sofr?.series||[]);
+  if(tail){
+    const p99vsIorb = (o.sofr.p99!=null)?(o.sofr.p99-iorb)*100:null;
+    const tSt = tail.z>3 ? 'red' : (tail.z>2 ? 'amber' : 'ok');
+    priceRows.push({
+      name:'SOFR 尾部 (p99 − 均值)', code:tail.date,
+      val:`${tail.last.toFixed(0)}bp`,
+      st: softenQ&&tSt==='red' ? 'amber' : tSt,
+      valcls: tail.z>3?'bad':(tail.z>2?'warn':'good'),
+      thr:`60日基线 ${tail.mean.toFixed(0)}±${tail.sd.toFixed(0)}bp · 当前 z=${tail.z.toFixed(1)}`,
+      logic:`回购市场里<b>最贵的那 1% 成交</b>比均值高多少。均值会被大量廉价成交拉低而显得平静,尾部却能暴露"边际借款人在抬价"——2019 年 9 月的裂缝就先出现在尾部。`
+        + (p99vsIorb!=null?` 当前 p99 比 IORB ${p99vsIorb>=0?'高':'低'} ${Math.abs(p99vsIorb).toFixed(0)}bp${(sofrSpread!=null&&sofrSpread<-5&&p99vsIorb>=-1)?' —— <b>注意:均值显示宽松,但最贵成交仍贴着 IORB,是典型的"均值掩盖尾部"</b>':''}。`:'')
+        + (softenQ?' ⚠ 季末,已弱化。':'')
+    });
+  }
+  $('priceRows').innerHTML=priceRows.map(rowHTML).join('');
+  if(o.sofr?.series&&o.effr?.series){
+    $('spreadCharts').innerHTML=
+      spreadChart(o.sofr.series, iorb, 'var(--water)', 'SOFR − IORB 趋势') +
+      spreadChart(o.effr.series, iorb, 'var(--amber)', 'EFFR − IORB 趋势');
+  }
+
+  // updated stamp
+  const errs=Object.keys(o.err||{});
+  const stamp=new Date().toLocaleString('zh-CN',{hour12:false});
+  $('updated').innerHTML=`更新 ${stamp}${qend?'<span class="qtag">季末</span>':''}`+
+    (errs.length?`<br><span class="err">取数失败: ${errs.join(', ')}(用手动/上次值)</span>`:'');
+}
+
+function rowHTML(r){
+  return `<div class="row">
+    <span class="light ${r.st}"></span>
+    <div class="rmain"><div class="rname">${r.name} <span class="code">${r.code||''}</span></div>
+      <div class="rlogic">${r.logic}</div></div>
+    <div class="rval"><div class="v ${r.valcls||''}">${r.val}</div><div class="thr">${r.thr}</div></div>
+  </div>`;
+}
+function tgaChg(o){
+  const s=o.tga?.series; if(!s||s.length<6) return null;
+  const last=s[s.length-1], ref=s[s.length-6];
+  const days=Math.round((new Date(last.date)-new Date(ref.date))/86400000);
+  return {val:last.val-ref.val, days};
+}
+function tgaTrendUp(o){ const c=tgaChg(o); return c!=null&&c.val>60; }
+
+/* ================= 杠杆模块 ================= */
+// FINRA: [YYYY-MM, marginDebt $B, freeCreditTotal $B]  (from FINRA margin-statistics.xlsx)
+const FINRA_DEFAULT=[["2025-03",880.3,366.0],["2025-04",850.6,363.8],["2025-05",921.0,364.4],["2025-06",1008.0,386.2],["2025-07",1022.5,381.4],["2025-08",1059.7,369.8],["2025-09",1126.5,399.0],["2025-10",1183.7,393.3],["2025-11",1214.3,396.5],["2025-12",1225.6,411.5],["2026-01",1279.0,400.6],["2026-02",1253.2,405.1],["2026-03",1220.9,427.5],["2026-04",1304.3,433.3],["2026-05",1415.6,423.9]];
+// IBKR: [YYYY-MM, marginLoans $B, clientEquity $B]  (from IBKR monthly metrics PR)
+const IBKR_DEFAULT=[["2025-05",61.2,628.2],["2025-06",65.1,664.6],["2025-08",71.8,713.2],["2025-09",77.3,757.5],["2026-03",86.0,789.4],["2026-05",100.9,937.3]];
+// Robinhood: [YYYY-MM, marginBookB]  (from Robinhood Monthly Metrics; NOTE: Feb-2026 High-Yield Cash program change caused a one-time reclassification break)
+const ROBINHOOD_DEFAULT=[["2026-01",31.5],["2026-05",19.5]];
+// Schwab: [YYYY-MM, marginBalancesB]  (from Schwab Monthly Activity Report)
+const SCHWAB_DEFAULT=[["2025-09",97.2],["2026-02",120.6],["2026-04",136.0],["2026-05",154.6]];
+const SPX_YOY_DEFAULT=20.4;  // S&P500 YoY as of 2026-07-07, update via FRED
+const SPX_MOM_DEFAULT=2.56;  // S&P500 MoM as of 2026-07-10, update via FRED
+
+let FINRA=[], IBKR=[], ROBINHOOD=[], SCHWAB=[], SPXYOY=SPX_YOY_DEFAULT, SPXMOM=SPX_MOM_DEFAULT;
+function loadLev(){
+  try{ const s=JSON.parse(localStorage.getItem('levdata')); if(s){FINRA=s.finra;IBKR=s.ibkr;ROBINHOOD=s.robinhood||ROBINHOOD_DEFAULT.map(r=>r.slice());SCHWAB=s.schwab||SCHWAB_DEFAULT.map(r=>r.slice());SPXYOY=s.spx??SPX_YOY_DEFAULT;SPXMOM=s.spxmom??SPX_MOM_DEFAULT;return;} }catch(e){}
+  FINRA=FINRA_DEFAULT.map(r=>r.slice()); IBKR=IBKR_DEFAULT.map(r=>r.slice());
+  ROBINHOOD=ROBINHOOD_DEFAULT.map(r=>r.slice()); SCHWAB=SCHWAB_DEFAULT.map(r=>r.slice()); SPXYOY=SPX_YOY_DEFAULT; SPXMOM=SPX_MOM_DEFAULT;
+}
+function saveLev(){ try{ localStorage.setItem('levdata',JSON.stringify({finra:FINRA,ibkr:IBKR,robinhood:ROBINHOOD,schwab:SCHWAB,spx:SPXYOY,spxmom:SPXMOM})); }catch(e){} }
+
+// NFCI: [YYYY-MM-DD, indexValue]  (FRED NFCI, weekly Friday release)
+const NFCI_DEFAULT=[["2025-05-16", -0.44], ["2025-05-23", -0.454], ["2025-05-30", -0.466], ["2025-06-06", -0.476], ["2025-06-13", -0.483], ["2025-06-20", -0.489], ["2025-06-27", -0.496], ["2025-07-04", -0.502], ["2025-07-11", -0.509], ["2025-07-18", -0.514], ["2025-07-25", -0.518], ["2025-08-01", -0.521], ["2025-08-08", -0.522], ["2025-08-15", -0.525], ["2025-08-22", -0.526], ["2025-08-29", -0.527], ["2025-09-05", -0.527], ["2025-09-12", -0.527], ["2025-09-19", -0.526], ["2025-09-26", -0.525], ["2025-10-03", -0.524], ["2025-10-10", -0.522], ["2025-10-17", -0.519], ["2025-10-24", -0.516], ["2025-10-31", -0.512], ["2025-11-07", -0.509], ["2025-11-14", -0.507], ["2025-11-21", -0.506], ["2025-11-28", -0.508], ["2025-12-05", -0.511], ["2025-12-12", -0.516], ["2025-12-19", -0.524], ["2025-12-26", -0.536], ["2026-01-02", -0.547], ["2026-01-09", -0.558], ["2026-01-16", -0.565], ["2026-01-23", -0.567], ["2026-01-30", -0.563], ["2026-02-06", -0.555], ["2026-02-13", -0.542], ["2026-02-20", -0.525], ["2026-02-27", -0.506], ["2026-03-06", -0.487], ["2026-03-13", -0.471], ["2026-03-20", -0.461], ["2026-03-27", -0.457], ["2026-04-03", -0.462], ["2026-04-10", -0.471], ["2026-04-17", -0.482], ["2026-04-24", -0.492], ["2026-05-01", -0.499], ["2026-05-08", -0.502], ["2026-05-15", -0.502], ["2026-05-22", -0.499], ["2026-05-29", -0.497], ["2026-06-05", -0.495], ["2026-06-12", -0.495], ["2026-06-19", -0.499], ["2026-06-26", -0.505], ["2026-07-03", -0.515]];
+// T10Y2Y: [YYYY-MM-DD, spreadPct]  (FRED T10Y2Y, resampled to weekly)
+const T10Y2Y_DEFAULT=[["2025-05-23", 0.51], ["2025-05-30", 0.52], ["2025-06-06", 0.47], ["2025-06-13", 0.45], ["2025-06-20", 0.48], ["2025-06-27", 0.56], ["2025-07-03", 0.47], ["2025-07-11", 0.53], ["2025-07-18", 0.56], ["2025-07-25", 0.49], ["2025-08-01", 0.54], ["2025-08-08", 0.51], ["2025-08-15", 0.58], ["2025-08-22", 0.58], ["2025-08-29", 0.64], ["2025-09-05", 0.59], ["2025-09-12", 0.5], ["2025-09-19", 0.57], ["2025-09-26", 0.57], ["2025-10-03", 0.55], ["2025-10-10", 0.53], ["2025-10-17", 0.56], ["2025-10-24", 0.54], ["2025-10-31", 0.51], ["2025-11-07", 0.56], ["2025-11-14", 0.52], ["2025-11-21", 0.55], ["2025-11-28", 0.55], ["2025-12-05", 0.58], ["2025-12-12", 0.67], ["2025-12-19", 0.68], ["2025-12-26", 0.68], ["2026-01-02", 0.72], ["2026-01-09", 0.64], ["2026-01-16", 0.65], ["2026-01-23", 0.64], ["2026-01-30", 0.74], ["2026-02-06", 0.72], ["2026-02-13", 0.64], ["2026-02-20", 0.6], ["2026-02-27", 0.59], ["2026-03-06", 0.59], ["2026-03-13", 0.55], ["2026-03-20", 0.51], ["2026-03-27", 0.56], ["2026-04-03", 0.51], ["2026-04-10", 0.5], ["2026-04-17", 0.55], ["2026-04-24", 0.53], ["2026-05-01", 0.51], ["2026-05-08", 0.48], ["2026-05-15", 0.5], ["2026-05-22", 0.43], ["2026-05-29", 0.47], ["2026-06-05", 0.38], ["2026-06-12", 0.39], ["2026-06-18", 0.27], ["2026-06-26", 0.31], ["2026-07-02", 0.35], ["2026-07-10", 0.35]];
+
+let NFCI=[], T10Y2Y=[];
+function loadMacro(){
+  try{ const s=JSON.parse(localStorage.getItem('macrodata')); if(s){NFCI=s.nfci;T10Y2Y=s.t10y2y;return;} }catch(e){}
+  NFCI=NFCI_DEFAULT.map(r=>r.slice()); T10Y2Y=T10Y2Y_DEFAULT.map(r=>r.slice());
+}
+function saveMacro(){ try{ localStorage.setItem('macrodata',JSON.stringify({nfci:NFCI,t10y2y:T10Y2Y})); }catch(e){} }
+function saveAll(){ saveLev(); saveMacro(); }
+
+
+function sortByDate(data){ data.sort((a,b)=> a[0]<b[0]?-1:(a[0]>b[0]?1:0)); }
+function buildTable(which){
+  const data=which==='finra'?FINRA:IBKR;
+  const c2=which==='finra'?'保证金债务':'保证金贷款';
+  const c3=which==='finra'?'自由信用':'客户权益';
+  let h=`<tr><th>月份</th><th>${c2}</th><th>${c3}</th><th></th></tr>`;
+  data.forEach((r,i)=>{
+    h+=`<tr>
+      <td><input class="ym" value="${r[0]}" onchange="editLev('${which}',${i},0,this.value)"></td>
+      <td><input type="number" step="0.1" value="${r[1]}" onchange="editLev('${which}',${i},1,this.value)"></td>
+      <td><input type="number" step="0.1" value="${r[2]}" onchange="editLev('${which}',${i},2,this.value)"></td>
+      <td><button class="delrow" onclick="deleteLevRow('${which}',${i})" title="删除此行">×</button></td>
+    </tr>`;
+  });
+  return h;
+}
+function editLev(which,i,col,val){
+  const data=which==='finra'?FINRA:IBKR;
+  data[i][col]= col===0? val : (parseFloat(val)||0);
+  if(col===0){ sortByDate(data); saveLev(); renderTables(); renderLev(); }
+  else { saveLev(); renderLev(); }
+}
+function renderTables(){
+  $('finraTab').innerHTML=buildTable('finra');
+  $('ibkrTab').innerHTML=buildTable('ibkr');
+  $('rhTab').innerHTML=buildTable1('robinhood');
+  $('scTab').innerHTML=buildTable1('schwab');
+  $('in_spxyoy').value=SPXYOY;
+  $('in_spxmom').value=SPXMOM;
+}
+function deleteLevRow(which,i){
+  const data=which==='finra'?FINRA:IBKR;
+  data.splice(i,1);
+  saveLev(); renderTables(); renderLev();
+}
+function addRow(which){
+  const data=which==='finra'?FINRA:IBKR;
+  const last=data[data.length-1];
+  // guess next month
+  let ym='';
+  if(last){ let [y,m]=last[0].split('-').map(Number); m++; if(m>12){m=1;y++;} ym=`${y}-${String(m).padStart(2,'0')}`; }
+  data.push([ym, last?last[1]:0, last?last[2]:0]);
+  sortByDate(data);
+  saveLev(); renderTables(); renderLev();
+}
+
+/* ================= PDF 自动识别模块(pdf.js,纯前端解析) ================= */
+let PDFJS_READY=null;
+function ensurePdfJs(){
+  if(PDFJS_READY) return PDFJS_READY;
+  PDFJS_READY=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; resolve(); };
+    s.onerror=()=>reject(new Error('pdf.js 加载失败,请检查网络'));
+    document.head.appendChild(s);
+  });
+  return PDFJS_READY;
+}
+async function extractPdfFirstPageText(file){
+  await ensurePdfJs();
+  const buf=await file.arrayBuffer();
+  const doc=await window.pdfjsLib.getDocument({data:buf}).promise;
+  const page=await doc.getPage(1);
+  const content=await page.getTextContent();
+  return content.items.map(it=>it.str).join(' ');
+}
+const MONTH_MAP={January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12};
+// 各数据源的解析规则(先只做 IBKR,后续可扩展)
+const PDF_PARSERS={
+  ibkr:{
+    label:'IBKR',
+    parse(text){
+      const ml=text.match(/margin loan balances of\s*\$?([\d.]+)\s*billion/i);
+      const eq=text.match(/client equity of\s*\$?([\d.]+)\s*billion/i);
+      const monY=text.match(/metrics for\s+(\w+)\s+(\d{4})/i);
+      const monOnly=text.match(/metrics for\s+(\w+)\b/i);
+      let ym=null;
+      if(monY){ const mm=MONTH_MAP[monY[1]]; if(mm) ym=`${monY[2]}-${String(mm).padStart(2,'0')}`; }
+      else if(monOnly){ const mm=MONTH_MAP[monOnly[1]]; if(mm){ const guessYear=new Date().getFullYear(); ym=`${guessYear}-${String(mm).padStart(2,'0')}`; } }
+      return {
+        ym, ml: ml?parseFloat(ml[1]):null, eq: eq?parseFloat(eq[1]):null,
+        needsReview: !ml || !eq || !monY // 没抓到年份时需要人工核对月份
+      };
+    },
+    apply(res){
+      $('ibkrP_ym').value=res.ym||'';
+      $('ibkrP_ml').value=res.ml!=null?res.ml:'';
+      $('ibkrP_eq').value=res.eq!=null?res.eq:'';
+    },
+    confirm(){
+      const ym=$('ibkrP_ym').value.trim(), ml=parseFloat($('ibkrP_ml').value), eq=parseFloat($('ibkrP_eq').value);
+      if(!ym||isNaN(ml)||isNaN(eq)) return false;
+      const idx=IBKR.findIndex(r=>r[0]===ym);
+      if(idx>=0) IBKR[idx]=[ym,ml,eq]; else { IBKR.push([ym,ml,eq]); IBKR.sort((a,b)=>a[0]<b[0]?-1:1); }
+      saveLev(); renderTables(); renderLev();
+      return true;
+    }
+  }
+};
+async function handlePdfFile(file, which){
+  if(!file) return;
+  const drop=$(which+'Drop'), dropText=$(which+'DropText'), preview=$(which+'Preview'), warn=$(which+'Warn');
+  drop.classList.add('busy'); dropText.innerHTML='⏳ 正在解析 PDF…';
+  try{
+    const text=await extractPdfFirstPageText(file);
+    const parser=PDF_PARSERS[which];
+    const res=parser.parse(text);
+    parser.apply(res);
+    warn.classList.remove('show'); warn.textContent='';
+    if(res.needsReview){
+      warn.textContent='⚠ 部分字段未能自动识别(或年份不确定),请核对/补全下方数值再确认。';
+      warn.classList.add('show');
+    }
+    preview.classList.add('show');
+  }catch(e){
+    warn.textContent='解析失败:'+e.message+'。可手动在下方表格填写。';
+    warn.classList.add('show');
+  }
+  drop.classList.remove('busy','dragover');
+  dropText.innerHTML=`📄 拖拽或点击上传 <b>${PDF_PARSERS[which].label} Monthly Metrics PDF</b><br>自动识别保证金贷款/客户权益`;
+}
+function handlePdfDrop(ev, which){
+  ev.preventDefault();
+  $(which+'Drop').classList.remove('dragover');
+  const file=ev.dataTransfer.files[0];
+  if(file) handlePdfFile(file, which);
+}
+function cancelPdfPreview(which){ $(which+'Preview').classList.remove('show'); }
+function confirmPdfPreview(which){
+  const ok=PDF_PARSERS[which].confirm();
+  if(ok){ $(which+'Preview').classList.remove('show'); }
+  else { $(which+'Warn').textContent='月份/数值不完整,请检查后再确认。'; $(which+'Warn').classList.add('show'); }
+}
+
+// single-value tables (Robinhood / Schwab: just [date, marginB])
+const TABLE1_CONFIG={
+  robinhood:{get:()=>ROBINHOOD, tabId:'rhTab', label:'保证金余额($B)', step:0.1, cadence:'month', render:()=>renderLev()},
+  schwab:   {get:()=>SCHWAB,    tabId:'scTab', label:'保证金余额($B)', step:0.1, cadence:'month', render:()=>renderLev()},
+  nfci:     {get:()=>NFCI,      tabId:'nfciTab', label:'NFCI指数值', step:0.01, cadence:'week', render:()=>renderMacro()},
+  t10y2y:   {get:()=>T10Y2Y,    tabId:'t10Tab',  label:'10Y−2Y(%)', step:0.01, cadence:'week', render:()=>renderMacro()}
+};
+function dataFor1(which){ return TABLE1_CONFIG[which].get(); }
+function buildTable1(which){
+  const cfg=TABLE1_CONFIG[which], data=cfg.get();
+  let h=`<tr><th>${cfg.cadence==='week'?'周(日期)':'月份'}</th><th>${cfg.label}</th><th></th></tr>`;
+  data.forEach((r,i)=>{
+    h+=`<tr>
+      <td><input class="ym" value="${r[0]}" onchange="editLev1('${which}',${i},0,this.value)"></td>
+      <td><input type="number" step="${cfg.step}" value="${r[1]}" onchange="editLev1('${which}',${i},1,this.value)"></td>
+      <td><button class="delrow" onclick="deleteLev1Row('${which}',${i})" title="删除此行">×</button></td>
+    </tr>`;
+  });
+  return h;
+}
+
+function buildNfciTable() {
+
+    const hist = LAST?.fred?.nfci?.history || [];
+
+    let h = `
+    <tr>
+        <th>周(日期)</th>
+        <th>NFCI指数值</th>
+    </tr>`;
+
+    hist
+        .slice()           // copy
+        .reverse()         // oldest → newest
+        .forEach(r => {
+
+            h += `
+            <tr>
+                <td>${r.date}</td>
+                <td>${fmt(r.value,3)}</td>
+            </tr>`;
+        });
+
+    return h;
+}
+
+function buildTable1(which){
+  const cfg=TABLE1_CONFIG[which], data=cfg.get();
+  let h=`<tr><th>${cfg.cadence==='week'?'周(日期)':'月份'}</th><th>${cfg.label}</th><th></th></tr>`;
+  data.forEach((r,i)=>{
+    h+=`<tr>
+      <td><input class="ym" value="${r[0]}" onchange="editLev1('${which}',${i},0,this.value)"></td>
+      <td><input type="number" step="${cfg.step}" value="${r[1]}" onchange="editLev1('${which}',${i},1,this.value)"></td>
+      <td><button class="delrow" onclick="deleteLev1Row('${which}',${i})" title="删除此行">×</button></td>
+    </tr>`;
+  });
+  return h;
+}
+
+// ===== Auto-generated FRED table =====
+function buildNfciTable(){
+
+    const hist = (LAST?.fred?.nfci?.history || []).slice(0, 52);
+
+    let h = `
+    <tr>
+        <th>周(日期)</th>
+        <th>NFCI指数值</th>
+    </tr>`;
+
+    hist.slice().reverse().forEach(r => {
+
+        h += `
+        <tr>
+            <td>${r.date}</td>
+            <td>${fmt(r.value,3)}</td>
+        </tr>`;
+
+    });
+
+    return h;
+}
+
+function buildT10Table(){
+
+    const hist = LAST?.fred?.t10y2y?.history || [];
+
+    let h = `
+    <tr>
+        <th>周(日期)</th>
+        <th>10Y-2Y(%)</th>
+    </tr>`;
+
+    hist.slice().reverse().forEach(r => {
+
+        h += `
+        <tr>
+            <td>${r.date}</td>
+            <td>${fmt(r.value,2)}</td>
+        </tr>`;
+
+    });
+
+    return h;
+}
+
+
+// ===== Auto-generated FRED table end =====
+
+function editLev1(which,i,col,val){
+  const cfg=TABLE1_CONFIG[which], data=cfg.get();
+  data[i][col]= col===0? val : (parseFloat(val)||0);
+  if(col===0){ sortByDate(data); saveAll(); $(cfg.tabId).innerHTML=buildTable1(which); cfg.render(); }
+  else { saveAll(); cfg.render(); }
+}
+function deleteLev1Row(which,i){
+  const cfg=TABLE1_CONFIG[which], data=cfg.get();
+  data.splice(i,1);
+  saveAll(); $(cfg.tabId).innerHTML=buildTable1(which); cfg.render();
+}
+function addRow1(which){
+  const cfg=TABLE1_CONFIG[which], data=cfg.get();
+  const last=data[data.length-1];
+  let nextDate='';
+  if(last){
+    if(cfg.cadence==='week'){
+      const d=new Date(last[0]+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+7);
+      nextDate=d.toISOString().slice(0,10);
+    } else {
+      let [y,m]=last[0].split('-').map(Number); m++; if(m>12){m=1;y++;}
+      nextDate=`${y}-${String(m).padStart(2,'0')}`;
+    }
+  }
+  data.push([nextDate, last?last[1]:0]);
+  sortByDate(data);
+  saveAll(); $(cfg.tabId).innerHTML=buildTable1(which); cfg.render();
+}
+
+function yoy(data,idx){ // percent change vs same month prior year
+  const [y,m]=data[idx][0].split('-'); const prior=`${+y-1}-${m}`;
+  const p=data.find(r=>r[0]===prior);
+  if(!p||!p[1]||p[1]===0) return null;
+  return ((data[idx][1]/p[1]-1)*100);
+}
+function mom(data,idx){ // percent change vs immediately preceding calendar month (null if data has a gap)
+  if(idx<1) return null;
+  const [y,m]=data[idx][0].split('-').map(Number);
+  let py=y, pm=m-1; if(pm<1){pm=12;py--;}
+  const priorYM=`${py}-${String(pm).padStart(2,'0')}`;
+  if(data[idx-1][0]!==priorYM) return null; // gap: previous row isn't the immediately preceding month
+  const prev=data[idx-1][1];
+  if(!prev||prev===0) return null;
+  return (data[idx][1]/prev-1)*100;
+}
+function growthSeries(data){ // returns [{date,yoy,mom}] for charting, null-safe across gaps
+  return data.map((r,i)=>({date:r[0], yoy:yoy(data,i), mom:mom(data,i)}));
+}
+function renderLev(){
+  SPXYOY=parseFloat($('in_spxyoy').value); if(isNaN(SPXYOY))SPXYOY=SPX_YOY_DEFAULT;
+  SPXMOM=parseFloat($('in_spxmom').value); if(isNaN(SPXMOM))SPXMOM=SPX_MOM_DEFAULT;
+  // FINRA
+  const f=FINRA[FINRA.length-1];
+  const fYoY=yoy(FINRA,FINRA.length-1);
+  const fMoM=mom(FINRA,FINRA.length-1);
+  const dueFinra=isMonthlyDue(f?f[0]:null, 21); setDue(['dueFinra'], dueFinra);
+  $('mdVal').innerHTML=f?fmt(f[1]/1000,2).replace(/\.?0+$/,'')+'<span class="unit">T</span>':'—';
+  $('mdMeta').textContent=f?`${f[0]} · 全市场借方余额`:'—';
+  const md=$('mdYoY'); if(fYoY!=null){ md.innerHTML=`同比 <b style="color:${fYoY>35?'var(--amber)':'var(--water)'}">${fYoY>=0?'+':''}${fmt(fYoY,1)}%</b>`; md.style.borderColor=fYoY>35?'var(--amber)':'var(--line)'; }
+  sparkline($('mdSpark'),FINRA.map(r=>({val:r[1]})),'#0A7178');
+  // credit balance
+  const cb=f?(f[2]-f[1]):null;
+  $('cbVal').innerHTML=cb!=null?(cb<0?'−':'')+fmt(Math.abs(cb),0)+'<span class="unit">B</span>':'—';
+  $('cbVal').style.color=cb<0?'var(--amber)':'var(--txt)';
+  $('cbNote').innerHTML=cb!=null?`${cb<0?'投资者欠款多于现金 · 高杠杆':'现金多于欠款 · 防御'}`:'—';
+  // IBKR
+  const b=IBKR[IBKR.length-1], bYoY=yoy(IBKR,IBKR.length-1), bMoM=mom(IBKR,IBKR.length-1);
+  const dueIbkr=isMonthlyDue(b?b[0]:null, 1); setDue(['dueIbkr'], dueIbkr);
+  $('ibVal').innerHTML=b?fmt(b[1],1)+'<span class="unit">B</span>':'—';
+  $('ibMeta').textContent=b?`${b[0]} · 领先 FINRA 约 3 周`:'—';
+  // divergence: margin loan MoM vs equity MoM
+  let div='—',dcol='var(--txt-2)';
+  if(IBKR.length>=2){
+    const p=IBKR[IBKR.length-2];
+    if(!p[1]||!p[2]) return;
+    const ibkrMonthDiff=Math.round((new Date(b[0]+'-01')-new Date(p[0]+'-01'))/86400000/30);
+    const ibkrMomLabel=ibkrMonthDiff<=1?'MoM':ibkrMonthDiff+'月变化';
+    const mlMoM=(b[1]/p[1]-1)*100, eqMoM=(b[2]/p[2]-1)*100, gap=mlMoM-eqMoM;
+    if(mlMoM<0&&eqMoM>0){div=`杠杆先掉头(${ibkrMomLabel}) · 去化早期信号`;dcol='var(--red)';}
+    else if(gap>2){div=`加杠杆(贷款+${fmt(mlMoM,1)}% > 权益+${fmt(eqMoM,1)}%)(${ibkrMomLabel})`;dcol='var(--amber)';}
+    else div=`同步(贷款${mlMoM>=0?'+':''}${fmt(mlMoM,1)}% / 权益${eqMoM>=0?'+':''}${fmt(eqMoM,1)}%)(${ibkrMomLabel})`;
+  }
+  $('ibDiv').innerHTML=div; $('ibDiv').style.borderColor=dcol==='var(--txt-2)'?'var(--line)':dcol;
+  sparkline($('ibSpark'),IBKR.map(r=>({val:r[1]})),'#0A7178');
+
+  // Robinhood
+  const rh=ROBINHOOD[ROBINHOOD.length-1], rhP=ROBINHOOD.length>1?ROBINHOOD[ROBINHOOD.length-2]:null;
+  const rhMoM = rhP? (rh[1]/rhP[1]-1)*100 : null;
+  const dueRh=isMonthlyDue(rh?rh[0]:null, 10); setDue(['dueRh'], dueRh);
+  $('rhVal').innerHTML=rh?fmt(rh[1],1)+'<span class="unit">B</span>':'—';
+  $('rhMeta').textContent=rh?`${rh[0]} · 散户端代理`:'—';
+  $('rhChg').innerHTML= rhMoM!=null? `环比 <b style="color:${rhMoM>0?'var(--amber)':'var(--water)'}">${rhMoM>=0?'+':''}${fmt(rhMoM,0)}%</b>` : '—';
+  sparkline($('rhSpark'),ROBINHOOD.map(r=>({val:r[1]})),'#0A7178');
+
+  // Schwab
+  const sc=SCHWAB[SCHWAB.length-1], scP=SCHWAB.length>1?SCHWAB[SCHWAB.length-2]:null;
+  const scMoM = scP? (sc[1]/scP[1]-1)*100 : null;
+  const dueSc=isMonthlyDue(sc?sc[0]:null, 13); setDue(['dueSc'], dueSc);
+  $('scVal').innerHTML=sc?fmt(sc[1],1)+'<span class="unit">B</span>':'—';
+  $('scMeta').textContent=sc?`${sc[0]} · 大众零售端代理`:'—';
+  $('scChg').innerHTML= scMoM!=null? `环比 <b style="color:${scMoM>0?'var(--amber)':'var(--water)'}">${scMoM>=0?'+':''}${fmt(scMoM,0)}%</b>` : '—';
+  sparkline($('scSpark'),SCHWAB.map(r=>({val:r[1]})),'#0A7178');
+
+  // 汇总:任一杠杆数据源过期,折叠面板标题也闪烁
+  setDue(['dueLevSum'], dueFinra||dueIbkr||dueRh||dueSc);
+
+  // excess leverage rows
+  const exArm=$('exArm');
+  const rows=[];
+  if(fYoY!=null){
+    const ex=fYoY-SPXYOY;
+    const st= ex>15?'red':(ex>8?'amber':(ex<-10?'amber':'ok'));
+    exArm.className='arm '+(ex>8?'armed':'live'); exArm.textContent= ex>15?'高危':(ex>8?'警戒':'正常');
+    rows.push({name:'超额杠杆 (FINRA · 同比)',code:f[0],val:(ex>=0?'+':'')+fmt(ex,1)+'pp',st,
+      valcls: ex>15?'bad':(ex>8?'warn':'good'), thr:'>+8pp 晚周期亢奋 · >+15pp 高危',
+      logic:`margin-debt 同比 ${fmt(fYoY,1)}% − 标普同比 ${fmt(SPXYOY,1)}%。杠杆增速远快于股价曾标记 2000/2007/2021 顶部;急剧转负=强制去化。极值当周期背景,非择时。`});
+  }
+  if(fMoM!=null){
+    const exm=fMoM-SPXMOM;
+    rows.push({name:'超额杠杆 (FINRA · 环比)',code:f[0],val:(exm>=0?'+':'')+fmt(exm,1)+'pp',
+      st: exm>10?'red':(exm>5?'amber':(exm<-8?'amber':'ok')),
+      valcls: exm>10?'bad':(exm>5?'warn':'good'), thr:'环比更敏感,能更早捕捉转向,但噪音也更大',
+      logic:`margin-debt 环比 ${fmt(fMoM,1)}% − 标普环比 ${fmt(SPXMOM,1)}%。同比是平滑后的趋势,环比反应最新一个月的动态——两者背离(比如同比仍高、环比已经转负)往往是拐点最早的信号,但单月数据噪音大,不要只看一个月就下结论。`});
+  }
+  if(bYoY!=null){
+    const exb=bYoY-SPXYOY;
+    rows.push({name:'超额杠杆 (IBKR 印证 · 同比)',code:b[0],val:(exb>=0?'+':'')+fmt(exb,1)+'pp',
+      st: exb>20?'amber':'ok', valcls: exb>20?'warn':'good', thr:'早 3 周的交叉验证',
+      logic:`盈透保证金贷款同比 ${fmt(bYoY,1)}%,比 FINRA 早约三周。单一券商、账户高速增长会抬高同比,重点看方向与 vs 权益的背离,不看绝对水平。`});
+  }
+  if(bMoM!=null){
+    const exbm=bMoM-SPXMOM;
+    rows.push({name:'超额杠杆 (IBKR 印证 · 环比)',code:b[0],val:(exbm>=0?'+':'')+fmt(exbm,1)+'pp',
+      st: exbm>15?'amber':'ok', valcls: exbm>15?'warn':'good', thr:'IBKR 环比同样比 FINRA 早约3周看到',
+      logic:`盈透保证金贷款环比 ${fmt(bMoM,1)}% − 标普环比 ${fmt(SPXMOM,1)}%。作为 FINRA 环比信号的抢跑印证,若两者同向变化,说明不是单一券商的噪音。`});
+  }
+  // Robinhood cross-check (retail speculative segment)
+  if(rh){
+    rows.push({name:'Robinhood 保证金(散户端)',code:rh[0],val:fmt(rh[1],1)+'B'+(rhMoM!=null?` (${rhMoM>=0?'+':''}${fmt(rhMoM,0)}% 环比)`:''),
+      st: rhMoM!=null&&rhMoM>25?'amber':'ok', valcls: rhMoM!=null&&rhMoM>25?'warn':'good',
+      thr:'散户投机杠杆的独立读数,与 FINRA/IBKR 不同客群',
+      logic:'Robinhood 客群更偏零售/投机,是FINRA全市场之外的独立交叉验证。注意 2026年2月 High-Yield Cash 计划调整造成一次性口径断点,前后数值谨慎比较。'});
+  }
+  // Schwab cross-check (mass-retail segment)
+  if(sc){
+    rows.push({name:'Schwab 保证金(大众零售端)',code:sc[0],val:fmt(sc[1],1)+'B'+(scMoM!=null?` (${scMoM>=0?'+':''}${fmt(scMoM,0)}% 环比)`:''),
+      st: scMoM!=null&&scMoM>15?'amber':'ok', valcls: scMoM!=null&&scMoM>15?'warn':'good',
+      thr:'大众零售端代理,客群比 IBKR 更普通',
+      logic:'嘉信客群覆盖面广、偏大众零售,和 IBKR(偏活跃/专业交易者)形成客群互补。三家券商(IBKR/Robinhood/Schwab)MoM同向走高,说明加杠杆是零售端普遍现象而非单一平台特例。'});
+  }
+  rows.push({name:'信用余额',code:f?f[0]:'',val:cb!=null?(cb<0?'−':'')+fmt(Math.abs(cb),0)+'B':'—',
+    st: cb<-900?'red':(cb<0?'amber':'ok'), valcls: cb<-900?'bad':(cb<0?'warn':'good'), thr:'负值越深=账户端缓冲越薄',
+    logic:'自由信用现金+保证金信用 − 保证金债务。深度为负意味满仓加杠杆、回撤时缓冲少,是脆弱性读数(非择时)。'});
+  $('exRows').innerHTML=rows.map(rowHTML).join('');
+
+  // 超额杠杆走势图:FINRA / IBKR 各自的同比+环比历史(标普参考线用当前手动输入值)
+  $('exCharts').innerHTML=
+    leverageChart(growthSeries(FINRA),'FINRA 杠杆增速',SPXYOY,SPXMOM) +
+    leverageChart(growthSeries(IBKR),'IBKR 杠杆增速',SPXYOY,SPXMOM);
+  // 杠杆走势主图(债务水位+信用余额+月度坡度)
+  drawLevTrendChart();
+}
+
+function leverageChart(series, title, spxYoyRef, spxMomRef){
+  // series: [{date,yoy,mom}]  — plot MoM as broken-segment solid line, YoY as sparse dots, plus SPX reference dashed lines
+  const W=300,H=125,pl=6,pr=6,pt=10,pb=18;
+  const momVals=series.map(r=>r.mom).filter(v=>v!=null);
+  const yoyVals=series.map(r=>r.yoy).filter(v=>v!=null);
+  const allVals=[...momVals,...yoyVals,spxYoyRef,spxMomRef].filter(v=>v!=null);
+  if(!allVals.length) return `<div class="chartbox"><div class="ctop"><span class="ctitle">${title}</span></div><div class="cpct">暂无足够历史数据(需要至少2个连续月份)</div></div>`;
+  let mn=Math.min(...allVals), mx=Math.max(...allVals);
+  const pad=(mx-mn)*0.15||3; mn-=pad; mx+=pad;
+  const n=series.length;
+  const X=i=>pl+(W-pl-pr)*i/(n-1||1);
+  const Y=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+
+  // MoM line, broken into segments wherever null appears
+  let segs=[], cur=[];
+  series.forEach((r,i)=>{
+    if(r.mom!=null){ cur.push([X(i),Y(r.mom)]); }
+    else { if(cur.length>1) segs.push(cur); cur=[]; }
+  });
+  if(cur.length>1) segs.push(cur);
+  const momPaths=segs.map(seg=>'<path d="'+seg.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')+'" fill="none" stroke="var(--water)" stroke-width="1.8"/>').join('');
+
+  // YoY sparse dots
+  const yoyDots=series.map((r,i)=>r.yoy!=null?`<circle cx="${X(i).toFixed(1)}" cy="${Y(r.yoy).toFixed(1)}" r="3" fill="var(--amber)"/>`:'').join('');
+
+  // reference lines
+  const zeroY=(mn<0&&mx>0)?Y(0):null;
+  const yoyRefY=spxYoyRef!=null?Y(spxYoyRef):null;
+  const momRefY=spxMomRef!=null?Y(spxMomRef):null;
+
+  // last point label
+  const lastMom=[...series].reverse().find(r=>r.mom!=null);
+  const lastYoy=[...series].reverse().find(r=>r.yoy!=null);
+
+  const lab=i=>`<text class="cx" x="${X(i).toFixed(1)}" y="${H-4}" text-anchor="${i===0?'start':i===n-1?'end':'middle'}">${series[i].date.slice(2,7)}</text>`;
+
+  return `<div class="chartbox">
+    <div class="ctop"><span class="ctitle">${title}</span>
+      <span class="cnow" style="color:var(--water)">环比 ${lastMom?fmt(lastMom.mom,1)+'%':'—'}</span>
+    </div>
+    <div class="cpct">
+      <span style="color:var(--water)">━ 环比MoM</span> &nbsp;
+      <span style="color:var(--amber)">● 同比YoY${lastYoy?' '+fmt(lastYoy.yoy,1)+'%':''}</span> &nbsp;
+      <span style="color:var(--txt-3)">┄ 标普参考线</span>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="aspect-ratio:${W}/${H}">
+      ${zeroY!=null?`<line x1="${pl}" y1="${zeroY.toFixed(1)}" x2="${W-pr}" y2="${zeroY.toFixed(1)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 2"/>`:''}
+      ${yoyRefY!=null?`<line x1="${pl}" y1="${yoyRefY.toFixed(1)}" x2="${W-pr}" y2="${yoyRefY.toFixed(1)}" stroke="var(--amber)" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>`:''}
+      ${momRefY!=null?`<line x1="${pl}" y1="${momRefY.toFixed(1)}" x2="${W-pr}" y2="${momRefY.toFixed(1)}" stroke="var(--water)" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>`:''}
+      ${momPaths}
+      ${yoyDots}
+      ${lab(0)}${lab(Math.floor((n-1)/2))}${lab(n-1)}
+    </svg></div>`;
+}
+
+function initLev(){
+  loadLev(); renderTables(); renderLev();
+  $('in_spxyoy').addEventListener('input',()=>{SPXYOY=parseFloat($('in_spxyoy').value)||SPX_YOY_DEFAULT;saveLev();renderLev();});
+  $('in_spxmom').addEventListener('input',()=>{SPXMOM=parseFloat($('in_spxmom').value)||SPX_MOM_DEFAULT;saveLev();renderLev();});
+}
+
+/* ================= 信用利差模块(周度) ================= */
+// [YYYY-MM-DD(周五快照), HY_OAS_pct, IG_OAS_pct]  (FRED BAMLH0A0HYM2 / BAMLC0A0CM, percentage points)
+const CREDIT_DEFAULT=[["2025-05-23",3.4,0.93],["2025-05-31",3.32,0.92],["2025-06-06",3.09,0.87],["2025-06-13",3.18,0.88],["2025-06-20",3.13,0.88],["2025-06-27",3.02,0.88],["2025-07-04",2.8,0.8],["2025-07-11",2.97,0.83],["2025-07-18",2.93,0.8],["2025-07-25",2.84,0.78],["2025-08-01",3.13,0.82],["2025-08-08",2.94,0.8],["2025-08-15",2.88,0.75],["2025-08-22",2.88,0.77],["2025-08-31",2.84,0.81],["2025-09-05",2.83,0.79],["2025-09-12",2.79,0.77],["2025-09-19",2.72,0.74],["2025-09-26",2.75,0.75],["2025-10-03",2.8,0.75],["2025-10-10",3.18,0.81],["2025-10-17",3.04,0.8],["2025-10-24",2.88,0.77],["2025-10-31",2.94,0.8],["2025-11-07",3.15,0.84],["2025-11-14",3.07,0.83],["2025-11-21",3.19,0.86],["2025-11-30",2.92,0.82],["2025-12-05",2.85,0.79],["2025-12-12",2.91,0.8],["2025-12-19",2.9,0.8],["2025-12-26",2.86,0.79],["2026-01-02",2.83,0.79],["2026-01-09",2.74,0.78],["2026-01-16",2.65,0.75],["2026-01-23",2.68,0.73],["2026-01-31",2.88,0.75],["2026-02-06",2.87,0.76],["2026-02-13",2.95,0.79],["2026-02-20",2.86,0.78],["2026-02-28",3.12,0.86],["2026-03-06",3.13,0.84],["2026-03-13",3.28,0.93],["2026-03-20",3.24,0.88],["2026-03-27",3.42,0.91],["2026-04-03",3.13,0.86],["2026-04-10",2.94,0.82],["2026-04-17",2.83,0.8],["2026-04-24",2.86,0.8],["2026-05-01",2.77,0.81],["2026-05-08",2.81,0.79],["2026-05-15",2.8,0.75],["2026-05-22",2.74,0.74],["2026-05-31",2.74,0.74],["2026-06-05",2.76,0.74],["2026-06-12",2.71,0.74],["2026-06-19",2.66,0.74],["2026-06-26",2.83,0.77],["2026-07-03",2.74,0.75],["2026-07-09",2.7,0.76]];
+const CREDIT_ALERT_BP=35; // 用户设定的4周走阔警戒线
+let CREDIT=[];
+function loadCredit(){
+  try{ const s=JSON.parse(localStorage.getItem('creditdata_wk')); if(s&&s.length){CREDIT=s;return;} }catch(e){}
+  CREDIT=CREDIT_DEFAULT.map(r=>r.slice());
+}
+function saveCredit(){ try{ localStorage.setItem('creditdata_wk',JSON.stringify(CREDIT)); }catch(e){} }
+
+function buildCreditTable(){
+
+    const hy = (LAST?.fred?.hy?.history || []).slice(0,52);
+    const ig = (LAST?.fred?.ig?.history || []).slice(0,52);
+
+    let h =
+    `<tr>
+        <th>周(日期)</th>
+        <th>HY OAS(%)</th>
+        <th>IG OAS(%)</th>
+        <th></th>
+    </tr>`;
+
+    const n = Math.min(hy.length, ig.length);
+
+    // oldest -> newest
+    for(let i=n-1;i>=0;i--){
+
+        h += `
+        <tr>
+
+            <td>
+                <input
+                    class="ym"
+                    value="${hy[i].date}"
+                    readonly>
+            </td>
+
+            <td>
+                <input
+                    type="number"
+                    step="0.01"
+                    value="${fmt(hy[i].value,2)}"
+                    readonly>
+            </td>
+
+            <td>
+                <input
+                    type="number"
+                    step="0.01"
+                    value="${fmt(ig[i].value,2)}"
+                    readonly>
+            </td>
+
+            <td></td>
+
+        </tr>`;
+    }
+
+    return h;
+}
+
+function editCredit(i,col,val){
+  CREDIT[i][col]= col===0? val : (parseFloat(val)||0);
+  if(col===0){ sortByDate(CREDIT); saveCredit(); $('creditTab').innerHTML=buildCreditTable(); renderCredit(); }
+  else { saveCredit(); renderCredit(); }
+}
+function deleteCreditRow(i){
+  CREDIT.splice(i,1);
+  saveCredit(); $('creditTab').innerHTML=buildCreditTable(); renderCredit();
+}
+function addCreditRow(){
+  const last=CREDIT[CREDIT.length-1];
+  let ymd=''; if(last){ const d=new Date(last[0]+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+7); ymd=d.toISOString().slice(0,10); }
+  CREDIT.push([ymd, last?last[1]:0, last?last[2]:0]);
+  sortByDate(CREDIT);
+  saveCredit(); $('creditTab').innerHTML=buildCreditTable(); renderCredit();
+}
+function creditChart(series,key,color,title){
+  const s=series.slice(-53); // ~12 months weekly + buffer point
+  const W=300,H=110,pl=6,pr=6,pt=8,pb=16;
+  const vals=s.map(r=>r[key]*100);
+  let mn=Math.min(...vals), mx=Math.max(...vals);
+  const pad=(mx-mn)*0.12||5; mn-=pad; mx+=pad;
+  const X=i=>pl+(W-pl-pr)*i/(s.length-1);
+  const Y=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+  const line=s.map((r,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(r[key]*100).toFixed(1)).join(' ');
+  const area=line+` L ${X(s.length-1).toFixed(1)} ${Y(mn).toFixed(1)} L ${X(0).toFixed(1)} ${Y(mn).toFixed(1)} Z`;
+  const last=s[s.length-1], lastX=X(s.length-1), lastY=Y(last[key]*100);
+  const lab=i=>`<text class="cx" x="${X(i).toFixed(1)}" y="${H-4}" text-anchor="${i===0?'start':i===s.length-1?'end':'middle'}">${s[i][0].slice(0,7)}</text>`;
+  return `<div class="chartbox">
+    <div class="ctop"><span class="ctitle">${title}</span><span class="cnow" style="color:${color}">${fmt(last[key]*100,0)}bp</span></div>
+    <div class="cpct">近12个月 · 区间 ${fmt(mn+pad,0)}~${fmt(mx-pad,0)}bp</div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="aspect-ratio:${W}/${H}">
+      <path d="${area}" fill="${color}" opacity="0.10"/>
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="1.6"/>
+      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" fill="${color}"/>
+      ${lab(0)}${lab(Math.floor((s.length-1)/2))}${lab(s.length-1)}
+    </svg></div>`;
+}
+
+function renderCredit(){
+  console.log("renderCredit()");
+  const fred = LAST?.fred;
+  console.log(fred);
+  console.log(fred.hy);
+  console.log(fred.ig);
+  if (!fred) return;
+  // 4周回看必须按【日期】找,不能按索引 —— 漏填/补录会让 CREDIT[n-5] 变成1.6周或9周前,35bp阈值失效
+  const hyHistory = fred.hy.history.map(x => [x.date, x.value]);
+  const P4 = lookbackByDays(
+    hyHistory,
+    fred.hy.date,
+    28,
+    10
+  );
+
+  const hyBp = fred.hy.value * 100;
+  const igBp = fred.ig.value * 100;
+  const diff = hyBp - igBp;
+
+  const hyChg = fred.hy.weeklyChange
+      ? fred.hy.weeklyChange.value * 100
+      : null;
+
+  const hyGap = fred.hy.weeklyChange
+      ? fred.hy.weeklyChange.gapDays
+      : null;
+
+  const igChg = fred.ig.weeklyChange
+      ? fred.ig.weeklyChange.value * 100
+      : null;
+
+  const igGap = fred.ig.weeklyChange
+      ? fred.ig.weeklyChange.gapDays
+      : null;
+
+  const hyChg4 = P4
+      ? (fred.hy.value - P4.row[1]) * 100
+      : null;
+   const win4   = P4? P4.gapDays : null;   // 实际回看了多少天(用于显示,避免"以为是4周其实不是")
+
+  // 到期提醒:信用利差按周更新,超过3天未更新视为过期
+  const creditDue =
+    daysSince(fred.hy.date) > 10 ||
+    daysSince(fred.ig.date) > 10;
+  setDue(['dueCreditHY','dueCreditIG','dueCreditSum'], creditDue);
+
+  console.log(hyBp, igBp, diff);
+  $('hyVal').innerHTML=fmt(hyBp,0)+'<span class="unit">bp</span>';
+  $('hyMeta').textContent=`${fred.hy.date} · ICE BofA US High Yield OAS`;
+  $('hyChg').innerHTML= hyChg!=null? `周变化 <b style="color:${hyChg>0?'var(--red)':'var(--water)'}">${hyChg>=0?'+':''}${fmt(hyChg,0)}bp</b>` : '—';
+  $('igVal').innerHTML=fmt(igBp,0)+'<span class="unit">bp</span>';
+  $('igChg').innerHTML= igChg!=null? `周变化 ${igChg>=0?'+':''}${fmt(igChg,0)}bp` : '—';
+  $('diffVal').innerHTML=fmt(diff,0)+'<span class="unit">bp</span>';
+  $('creditTab').innerHTML = buildCreditTable();
+  $('diffNote').textContent = diff<150?'紧 · 分层定价宽松':diff<250?'中性':'走阔 · 风险分层加剧';
+
+  // ---- 35bp 4周走阔警报(独立面板,用户设定阈值)----
+  const alertArm=$('creditAlertArm');
+  const measurable = hyChg4!=null;                                    // 找不到合规的28天窗口 → 不可测,而非"未触发"
+  const triggered = measurable && hyChg4>=CREDIT_ALERT_BP;
+  const buffer    = measurable && hyChg4>=CREDIT_ALERT_BP*0.6 && !triggered;
+  alertArm.className='arm '+(!measurable?'locked':(triggered||buffer)?'armed':'live');
+  alertArm.textContent= !measurable?'不可测':(triggered?'已触发':buffer?'临近':'未触发');
+  const alertRow=[{
+    name:'4周利差走阔',code:fred.hy.date,
+    val: measurable?(hyChg4>=0?'+':'')+fmt(hyChg4,0)+'bp':'—',
+    st: !measurable?'mute':(triggered?'red':buffer?'amber':'ok'),
+    valcls: !measurable?'':(triggered?'bad':buffer?'warn':'good'),
+    thr:`警戒线 ${CREDIT_ALERT_BP}bp${measurable?` · 实际窗口 ${win4} 天`:''}`,
+    logic: !measurable
+      ? '<b>无法计算:数据里找不到 28±10 天前的对照行。</b>阈值是按严格的4周窗口校准的,窗口不对就不能套用 —— 请把周度表补齐(每周一行)再看此警报。'
+      : triggered
+        ? `已触发:过去 ${win4} 天 HY OAS 累计走阔 ${fmt(hyChg4,0)}bp,超过 ${CREDIT_ALERT_BP}bp 警戒线。历史回测显示这类幅度的走阔后,标普跌幅区间很宽(0~−22.5%),不代表固定跌幅,但值得重新检视风险敞口。`
+        : `未触发:过去 ${win4} 天走阔 ${fmt(hyChg4,0)}bp,低于 ${CREDIT_ALERT_BP}bp 警戒线。`
+  }];
+  $('creditAlertRow').innerHTML=alertRow.map(rowHTML).join('');
+
+  const arm=$('creditArm');
+  const lvlSt = hyBp<350?'ok':hyBp<600?'amber':'red';
+  arm.className='arm '+(hyBp<350?'live':'armed');
+  arm.textContent = hyBp<350?'宽松':hyBp<600?'留意':'压力';
+
+  const rows=[
+    {name:'HY OAS 绝对水平',code:fred.hy.date,val:fmt(hyBp,0)+'bp',
+     st:lvlSt, valcls: hyBp<350?'good':hyBp<600?'warn':'bad',
+     thr:'<350bp 自满 · 350–600 中性 · >600 压力 · >800 历史与衰退共现',
+     logic:`当前处于${hyBp<350?'历史偏紧(自满)端':hyBp<600?'中性区间':'压力区间'}。垃圾债相对国债多付 ${fmt(hyBp,0)}bp${hyBp<350?',几乎未给违约风险定价':hyBp<600?',对违约风险的定价处于中性':',市场已在为违约风险显著要价'}。`},
+    {name:'HY − IG 差值',code:fred.hy.date,val:fmt(diff,0)+'bp',
+     st: diff<150?'ok':diff<250?'amber':'red', valcls: diff<150?'good':diff<250?'warn':'bad',
+     thr:'降级至垃圾级的边际风险溢价 · 紧=风险分层定价宽松',
+     logic:`当前 ${fmt(diff,0)}bp。${diff<150?'这个差值紧,说明市场对"从投资级降到垃圾级"这件事本身要求的额外补偿很低,是更细颗粒度的自满信号':diff<250?'处于中性区间':'差值走阔,说明市场开始为"降级到垃圾级"要求明显更高的补偿,信用分层正在重新定价'}。`}
+  ];
+  $('creditRows').innerHTML=rows.map(rowHTML).join('');
+
+  // ---- 12个月走势图 ----
+  $('creditCharts').innerHTML=
+    creditChart(CREDIT,1,'var(--water)','HY OAS 走势') +
+    creditChart(CREDIT,2,'var(--amber)','IG OAS 走势');
+}
+function initCredit(){ loadCredit(); $('creditTab').innerHTML=buildCreditTable(); }
+
+/* ================= 宏观条件模块(NFCI + 2s10s) ================= */
+function macroChart(series,color,title,unit,decimals){
+  const s=series.slice(-53);
+  const W=300,H=110,pl=6,pr=6,pt=8,pb=16;
+  const vals=s.map(r=>r[1]);
+  let mn=Math.min(...vals), mx=Math.max(...vals);
+  const pad=(mx-mn)*0.12||0.05; mn-=pad; mx+=pad;
+  const X=i=>pl+(W-pl-pr)*i/(s.length-1);
+  const Y=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+  const line=s.map((r,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(r[1]).toFixed(1)).join(' ');
+  const area=line+` L ${X(s.length-1).toFixed(1)} ${Y(mn).toFixed(1)} L ${X(0).toFixed(1)} ${Y(mn).toFixed(1)} Z`;
+  const last=s[s.length-1], lastX=X(s.length-1), lastY=Y(last[1]);
+  const zeroY=(mn<0&&mx>0)?Y(0).toFixed(1):null;
+  const lab=i=>`<text class="cx" x="${X(i).toFixed(1)}" y="${H-4}" text-anchor="${i===0?'start':i===s.length-1?'end':'middle'}">${s[i][0].slice(0,7)}</text>`;
+  return `<div class="chartbox">
+    <div class="ctop"><span class="ctitle">${title}</span><span class="cnow" style="color:${color}">${last[1].toFixed(decimals)}${unit}</span></div>
+    <div class="cpct">近12个月 · 区间 ${(mn+pad).toFixed(decimals)}~${(mx-pad).toFixed(decimals)}${unit}</div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="aspect-ratio:${W}/${H}">
+      ${zeroY?`<line x1="${pl}" y1="${zeroY}" x2="${W-pr}" y2="${zeroY}" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 3"/>`:''}
+      <path d="${area}" fill="${color}" opacity="0.10"/>
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="1.6"/>
+      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" fill="${color}"/>
+      ${lab(0)}${lab(Math.floor((s.length-1)/2))}${lab(s.length-1)}
+    </svg></div>`;
+}
+
+
+function renderMacro(){
+
+  const fred = LAST?.fred;
+  if (!fred) return;
+
+  const nfci = fred.nfci;
+  const curve = fred.t10y2y;
+
+  if (!nfci || !curve) return;
+
+  // ===== Weekly changes from Worker =====
+  const nChg = nfci.weeklyChange
+      ? nfci.weeklyChange.value
+      : null;
+
+  const tChg = curve.weeklyChange
+      ? curve.weeklyChange.value
+      : null;
+
+  // ===== Sparkline history =====
+  const nfciHistory = nfci.history.map(r => ({ val: r.value }));
+  const curveHistory = curve.history.map(r => ({ val: r.value }));
+
+  // ===== Due reminder =====
+  const dueN = daysSince(nfci.date) > 10;
+  const dueT = daysSince(curve.date) > 3;
+
+  setDue(['dueNfci'], dueN);
+  setDue(['dueT10y2y'], dueT);
+  setDue(['dueMacroSum'], dueN || dueT);
+
+  // ===== NFCI =====
+  $('nfciVal').innerHTML = fmt(nfci.value,3);
+
+  $('nfciMeta').textContent =
+      `${nfci.date} · 综合信用/杠杆/风险的合成指数`;
+
+  $('nfciChg').innerHTML =
+      nChg != null
+      ? `周变化 <b style="color:${nChg>0?'var(--amber)':'var(--water)'}">${nChg>=0?'+':''}${fmt(nChg,3)}</b>`
+      : '—';
+
+  sparkline(
+      $('nfciSpark'),
+      nfciHistory,
+      '#0A7178'
+  );
+
+  // ===== 2S10S =====
+  $('t10Val').innerHTML =
+      fmt(curve.value,2)+'<span class="unit">%</span>';
+
+
+  $('t10Chg').innerHTML =
+      tChg != null
+      ? `周变化 <b style="color:${tChg<0?'var(--amber)':'var(--water)'}">${tChg>=0?'+':''}${fmt(tChg,2)}pp</b>`
+      : '—';
+
+  sparkline(
+      $('t10Spark'),
+      curveHistory,
+      '#0A7178'
+  );
+
+  // ===== Summary =====
+  const arm = $('macroArm');
+
+  const nfciTight = nfci.value > 0.3;
+  const curveInverted = curve.value < 0;
+
+  arm.className =
+      'arm '+((nfciTight || curveInverted)?'armed':'live');
+
+  arm.textContent =
+      curveInverted
+      ? '倒挂'
+      : (nfciTight ? '趋紧' : '正常');
+
+  const rows = [
+
+    {
+      name:'NFCI 金融条件',
+      code:nfci.date,
+      val:fmt(nfci.value,3),
+
+      st:nfci.value>0.5?'red':
+         nfci.value>0?'amber':'ok',
+
+      valcls:nfci.value>0.5?'bad':
+             nfci.value>0?'warn':'good',
+
+      thr:'0=历史均值 · 负=较均值宽松 · 正=较均值收紧',
+
+      logic:
+      nfci.value<0
+      ? '当前较历史均值更宽松,和我们追踪的低位信用利差、高位杠杆图景一致。NFCI 本身综合利率、信用、杠杆和风险四类指标,可作为官方交叉验证。'
+      : '当前较历史均值收紧,与其他宽松信号形成背离,值得留意。NFCI 综合了利率、信用、杠杆和风险四类指标,可作为官方交叉验证。'
+    },
+
+    {
+      name:'2s10s 收益率曲线',
+      code:curve.date,
+      val:fmt(curve.value,2)+'pp',
+
+      st:curveInverted
+          ?'red'
+          :(curve.value<0.2?'amber':'ok'),
+
+      valcls:curveInverted
+          ?'bad'
+          :(curve.value<0.2?'warn':'good'),
+
+      thr:'负值(倒挂)历史上是衰退领先信号',
+
+      logic:
+      curveInverted
+      ? '曲线倒挂:短端利率高于长端,市场通常预期未来降息或经济放缓。'
+      : `曲线正常,当前斜率 ${fmt(curve.value,2)}pp。历史上重新转正(re-steepening)本身仍值得关注。`
+    }
+
+  ];
+
+  // Charts
+
+  $('macroRows').innerHTML =
+      rows.map(rowHTML).join('');
+
+  $('macroCharts').innerHTML =
+      macroChart(
+          nfci.history.map(r=>[r.date,r.value]),
+          'var(--water)',
+          'NFCI 走势',
+          '',
+          3
+      )
+      +
+      macroChart(
+          curve.history.map(r=>[r.date,r.value]),
+          'var(--amber)',
+          '2s10s 走势',
+          'pp',
+          2
+      );
+
+  // Update the history tables
+
+  $('nfciTab').innerHTML = buildNfciTable();
+  $('t10Tab').innerHTML = buildT10Table();
+
+
+}
+
+
+
+function initMacro(){
+  loadMacro();
+}
+
+function resetToDefaults(){
+  if(!confirm('将清空浏览器本地保存的所有手动数据(杠杆/信用/宏观/校准),恢复为内置默认值。确定吗?')) return;
+  ['levdata','creditdata_wk','macrodata','liqcalib'].forEach(k=>{ try{localStorage.removeItem(k);}catch(e){} });
+  location.reload();
+}
+
+initInputs();
+initLev();
+initCredit();
+initMacro();
+run();
+</script>
+</body>
+</html>
